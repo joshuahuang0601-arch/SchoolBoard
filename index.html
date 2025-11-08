@@ -167,12 +167,20 @@ if(!storedUid){
 set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
 
 // Welcome
-welcome.addEventListener('click',()=>{
-  // 先显示 forumPage 再做渐变
+welcome.addEventListener('click', ()=>{
+  // 先显示 forumPage
   forumPage.classList.remove('hidden');
-  setTimeout(()=>forumPage.style.opacity=1, 50); // 延迟保证 transition 生效
+  forumPage.style.opacity = 0;
+
+  // 渐隐欢迎屏
   welcome.style.opacity = 0;
-  setTimeout(()=>welcome.remove(), 400);
+
+  setTimeout(()=>{
+    welcome.remove();
+    // 渐显 forumPage
+    forumPage.style.transition = 'opacity 0.4s';
+    forumPage.style.opacity = 1;
+  }, 50); // 50ms 延迟保证浏览器渲染
 });
 
 
@@ -194,23 +202,37 @@ userTag.addEventListener('click', ()=>{
   set(ref(db, `users/${currentUser.uid}/name`), newName);
 });
 
-userIdTag.addEventListener('click', ()=>{
-  const newId = prompt("Enter new ID (12 chars max):", currentUserId);
-  if(!newId) return;
-  if(newId !== ADMIN_ID && newId.length > 12) return alert("Invalid ID");
+import { get, ref, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
-  onValue(ref(db,'users'), snap=>{
-    const users = snap.val()||{};
-    if(Object.values(users).some(u=>u.userId===newId)){
-      alert("ID taken");
+userIdTag.addEventListener('click', async () => {
+  const newId = prompt("Enter new ID (12 chars max):", currentUserId);
+  if (!newId) return;
+  if (newId !== "ADMINISTRATOR" && newId.length > 12) return alert("Invalid ID");
+
+  try {
+    // 获取所有用户数据一次
+    const usersSnap = await get(ref(db, 'users'));
+    const users = usersSnap.val() || {};
+
+    // 检查是否有重复
+    if (Object.values(users).some(u => u.userId === newId)) {
+      alert("This ID is already taken by another user.");
       return;
     }
+
+    // 没有重复，更新 Firebase 和本地
     currentUserId = newId;
     userIdTag.innerText = currentUserId;
-    set(ref(db, `users/${currentUser.uid}/userId`), currentUserId);
+    await set(ref(db, `users/${currentUser.uid}/userId`), currentUserId);
     localStorage.setItem('deviceId', currentUserId);
-  }, {onlyOnce:true});
+
+    alert("ID updated successfully!");
+  } catch (err) {
+    console.error("Error checking/updating userId:", err);
+    alert("Failed to update ID. Try again later.");
+  }
 });
+
  
 // ---------- Realtime & Forum ----------
 function renderForum(){
@@ -255,23 +277,7 @@ backToForumBtn.addEventListener('click',()=>{
   newPostContent.value=''; 
   editorStatus.innerText='';
 });
-// ---------- Open Topic ----------
-window.openTopic = function(topicId){
-  currentTopicId = topicId;
-  forumPage.classList.add('hidden'); 
-  topicPage.classList.remove('hidden'); 
-  topicPage.style.opacity = 1; 
-  renderTopicPage(topicId);
-}
 
-backToForumBtn.addEventListener('click', ()=>{
-  topicPage.classList.add('hidden'); 
-  forumPage.classList.remove('hidden'); 
-  forumPage.style.opacity = 1; 
-  currentTopicId = null; 
-  newPostContent.value = ''; 
-  editorStatus.innerText = '';
-});
 
 // ---------- Render Topic & Posts ----------
 function renderTopicPage(topicId){
@@ -344,33 +350,9 @@ function renderPostRecursive(post, parentElem, topicId){
 
   lucide.createIcons();
 }
-  // Render Replies
-  if(post.replies){
-    toggleEl.classList.remove('hidden');
-    toggleEl.addEventListener('click',()=>{
-      repliesEl.classList.toggle('hidden');
-      toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-    });
-    Object.entries(post.replies).forEach(([rid,rp])=>renderPostRecursive({...rp,id:rid},repliesEl,topicId));
-    toggleEl.innerText=`Show Replies (${Object.keys(post.replies).length})`;
-  }
-
-  lucide.createIcons();
-}
 
 // ---------- Submit Reply ----------
 window.submitReply=function(postId,content){
-  if(!content.trim()) return;
-  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
-    authorName: currentUserName,
-    authorUid: currentUser.uid,
-    content: content,
-    timestamp: Date.now()
-  });
-}
-
-// ---------- Submit Reply ----------
-window.submitReply = function(postId, content){
   if(!content.trim()) return;
   push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
     authorName: currentUserName,
@@ -395,12 +377,17 @@ postBtn.addEventListener('click', ()=>{
   setTimeout(()=>editorStatus.innerText='', 1000);
 });
 
-window.likePost = function(postId){
+import { get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+window.likePost = async function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  onValue(likeRef, snap=>{
-    snap.exists() ? remove(likeRef) : set(likeRef, true);
-  }, {onlyOnce:true});
-}
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    remove(likeRef);
+  }else{
+    set(likeRef, true);
+  }
+};
 
 window.deletePost = function(postId){
   const post = topicsCache[currentTopicId]?.posts?.[postId];
