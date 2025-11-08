@@ -282,7 +282,7 @@ function renderPostRecursive(post, parentElem, topicId){
     </div>
     <div class="mt-2 text-gray-700">${escapeHtml(post.content)}</div>
     <span class="collapse-toggle ${post.replies?'':'hidden'}">Show Replies (${post.replies?Object.keys(post.replies).length:0})</span>
-    <div class="reply-container"></div>
+    <div class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`)==='true'?'expanded':''}"></div>
     <div class="mt-2 hidden flex gap-1 reply-box">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
       <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
@@ -292,6 +292,8 @@ function renderPostRecursive(post, parentElem, topicId){
   lucide.createIcons();
 
   const replyContainer = div.querySelector('.reply-container');
+
+  // 递归渲染子回复
   if(post.replies){
     Object.entries(post.replies).forEach(([rid,rPost])=>{
       renderPostRecursive({id:rid, ...rPost}, replyContainer, topicId);
@@ -341,33 +343,11 @@ function renderPostRecursive(post, parentElem, topicId){
   toggleBtn.addEventListener('click', e=>{
     e.stopPropagation();
     const expanded = replyContainer.classList.toggle('expanded');
+    localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
     toggleBtn.innerText = expanded ? `Hide Replies (${Object.keys(post.replies||{}).length})` : `Show Replies (${Object.keys(post.replies||{}).length})`;
   });
 }
 
-
-  const postContentDiv = div.querySelector(`#postContent-${post.id}`);
-  const replyBox = div.querySelector(`#replyBox-${post.id}`);
-  const replyInput = replyBox.querySelector('input');
-  const sendBtn = replyBox.querySelector('button');
-  postContentDiv.addEventListener('click', ()=>{
-    replyBox.classList.remove('hidden');
-    replyInput.focus();
-  });
-
-  sendBtn.addEventListener('click', ()=>{
-    const val = replyInput.value.trim();
-    if(!val) return;
-    push(ref(db, `topics/${currentTopicId}/posts/${post.id}/replies`),{
-      authorName: currentUserName,
-      authorUid: currentUser.uid,
-      content: val,
-      timestamp: Date.now()
-    });
-    replyInput.value = '';
-    replyBox.classList.add('hidden');
-  });
-}
 postBtn.addEventListener('click', ()=>{
   const content = newPostContent.value.trim();
   if(!content) return;
