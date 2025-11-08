@@ -321,17 +321,73 @@ function renderPostRecursive(post, parentElem, topicId){
     box.querySelector('input').focus();
   });
 
-  // Render replies recursively
-  if(post.replies){
+  // ---------- Recursive Reply Rendering ----------
+function renderReplyRecursive(reply, parentElem, topicId, parentPostId){
+  const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
+  const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
+  const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
+
+  const div = document.createElement('div');
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  div.innerHTML = `
+    <div class="flex justify-between items-start">
+      <div>
+        <div class="font-medium text-gray-700">${escapeHtml(reply.authorName||"Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp||0)}</div>
+      </div>
+      <div class="flex gap-2 post-actions">
+        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete ? `<i onclick="deleteReply('${parentPostId}','${reply.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
+      </div>
+    </div>
+    <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
+    <div id="replies-${reply.id}" class="mt-2"></div>
+  `;
+  parentElem.appendChild(div);
+
+  // Render nested replies
+  if(reply.replies){
+    Object.entries(reply.replies).forEach(([rid,rp])=>{
+      renderReplyRecursive({...rp,id:rid}, div.querySelector(`#replies-${reply.id}`), topicId, parentPostId);
+    });
+  }
+
+  lucide.createIcons();
+}
+
+// ---------- Like Reply ----------
+window.likeReply = async function(postId, replyId){
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    remove(likeRef);
+  } else {
+    set(likeRef, true);
+  }
+}
+
+// ---------- Delete Reply ----------
+window.deleteReply = async function(postId, replyId){
+  const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
+  const snap = await get(replyRef);
+  if(!snap.exists()) return;
+  if(!confirm("Delete this reply?")) return;
+  remove(replyRef);
+}
+
+  // Render replies recursively using dedicated function
+if(post.replies){
   toggleEl.classList.remove('hidden');
   toggleEl.addEventListener('click', ()=>{
     repliesEl.classList.toggle('hidden');
     toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
   });
   Object.entries(post.replies).forEach(([rid,rp])=>{
-    renderPostRecursive({...rp,id:rid}, repliesEl, topicId);
+    renderReplyRecursive({...rp,id:rid}, repliesEl, topicId, post.id);
   });
 }
+
 
   lucide.createIcons();
 }
@@ -393,25 +449,32 @@ deleteTopicBtn.addEventListener('click', ()=>{
   topicPage.classList.add('hidden'); 
   forumPage.classList.remove('hidden');
 });
-  // ---------- Create Topic ----------
-createTopicBtn.addEventListener("click", async ()=>{
+  createTopicBtn.addEventListener("click", async ()=>{
+  if(!currentUser) return alert("Still signing in... try again in a sec");
+
   const name = topicNameInput.value.trim();
   const desc = topicDescInput.value.trim();
 
   if(!name) return alert("Enter topic name");
 
-  const newTopicRef = push(ref(db, "topics"));
-  await set(newTopicRef, {
-    topicName: name,
-    description: desc,
-    authorUid: currentUser.uid,
-    timestamp: Date.now()
-  });
+  try {
+    const newTopicRef = push(ref(db, "topics"));
+    await set(newTopicRef, {
+      topicName: name,
+      description: desc,
+      authorUid: currentUser.uid,
+      timestamp: Date.now()
+    });
 
-  topicNameInput.value = "";
-  topicDescInput.value = "";
-  alert("Topic Created!");
+    topicNameInput.value = "";
+    topicDescInput.value = "";
+    alert("Topic Created!");
+  } catch(err) {
+    console.error(err);
+    alert("Failed to create topic, try again later");
+  }
 });
+
 
 </script>
 </body>
