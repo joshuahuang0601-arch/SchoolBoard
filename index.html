@@ -87,10 +87,10 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, set, get, child } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-// Firebase config
+// --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
   authDomain: "schoolboard-942bc.firebaseapp.com",
@@ -105,28 +105,18 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// --- User info ---
-let currentUser = null;
-let currentUserName = localStorage.getItem('anonName') || prompt("Enter display name:", "Anonymous") || "Anonymous";
-let currentUserId = localStorage.getItem('anonId');
-if(!currentUserId){
-  currentUserId = generateUserId();
-  localStorage.setItem('anonId', currentUserId);
-}
-userTagUpdate();
+let currentUser=null;
+let currentUserName = localStorage.getItem('anonName') || prompt("Enter your display name:", "Anonymous") || "Anonymous";
+let currentUserId = localStorage.getItem('anonId') || generateUserId();
+localStorage.setItem('anonName', currentUserName);
+localStorage.setItem('anonId', currentUserId);
 
-function generateUserId(){
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let id = '';
-  for(let i=0;i<12;i++){ id += chars[Math.floor(Math.random()*chars.length)]; }
-  return id;
-}
+const ADMIN_ID = "ADMINISTRATOR"; // 管理员ID
 
-function userTagUpdate(){
-  userTag.innerText = `User: ${currentUserName}`;
-  userIdTag.innerText = `ID: ${currentUserId}`;
-}
+let topicsCache={};
+let currentTopicId=null;
 
+// DOM Elements
 const welcome=document.getElementById('welcome-screen');
 const forumPage=document.getElementById('forumPage');
 const topicPage=document.getElementById('topicPage');
@@ -147,39 +137,15 @@ const editorStatus=document.getElementById('editorStatus');
 const userTag=document.getElementById('userTag');
 const userIdTag=document.getElementById('userIdTag');
 
-// Click username to change
-userTag.addEventListener('click', ()=>{
-  const newName = prompt("Enter display name:", currentUserName);
-  if(newName && newName.trim()){
-    currentUserName = newName.trim();
-    localStorage.setItem('anonName', currentUserName);
-    userTagUpdate();
-  }
-});
-userIdTag.addEventListener('click', ()=>{
-  const newId = prompt("Enter new ID (12 chars max, letters+numbers):", currentUserId);
-  if(newId && /^[A-Z0-9]{1,12}$/.test(newId)){
-    currentUserId = newId;
-    localStorage.setItem('anonId', currentUserId);
-    userTagUpdate();
-  }else alert("Invalid ID format!");
-});
+userTag.innerText = currentUserName;
+userIdTag.innerText = currentUserId;
 
-// --- Auth ---
-let storedUid = localStorage.getItem('anonUid');
-if(!storedUid){
-  signInAnonymously(auth).then(u=>{
-    storedUid=u.user.uid;
-    localStorage.setItem('anonUid',storedUid);
-    currentUser=u.user;
-    initRealtime();
-  }).catch(console.error);
-}else{
-  currentUser={uid:storedUid};
-  initRealtime();
-}
+// --- Helper Functions ---
+function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
+function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
+function generateUserId(){return (Math.random().toString(36).substring(2,10)+Math.random().toString(36).substring(2,6)).toUpperCase();}
 
-// Welcome
+// --- Welcome Screen ---
 welcome.addEventListener('click',()=>{
   welcome.style.opacity=0;
   setTimeout(()=>{
@@ -189,55 +155,111 @@ welcome.addEventListener('click',()=>{
   },400);
 });
 
-// Realtime
+// --- Anonymous Auth ---
+signInAnonymously(auth).then(u=>{
+  currentUser = u.user;
+  initRealtime();
+}).catch(console.error);
+
+// --- Realtime Listener ---
 function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
-    topicsCache=snap.val()||{};
+    topicsCache = snap.val() || {};
     renderForum();
-    renderDrafts();
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
-  onValue(ref(db,`drafts/${currentUser.uid}`),snap=>{
-    renderDrafts(snap.val()||{});
-  });
 }
 
-let topicsCache = {};
-let currentTopicId = null;
+// --- Render Forum ---
+function renderForum(){
+  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=> (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0));
+  forumContainer.innerHTML = arr.map(t=>`
+    <div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
+      <div>
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
+      </div>
+    </div>
+  `).join('');
+}
 
-const postsContainer = document.getElementById('postsContainer');
-const newPostContent = document.getElementById('newPostContent');
-const postBtn = document.getElementById('postBtn');
-const editorStatus = document.getElementById('editorStatus');
-const deleteTopicBtn = document.getElementById('deleteTopicBtn');
-
-// Render Topic Page
-function renderTopicPage(topicId){
-  const topic = topicsCache[topicId];
-  if(!topic) return;
+// --- Open Topic ---
+window.openTopic = function(topicId){
   currentTopicId = topicId;
-  document.getElementById('topicPageName').innerText = topic.topicName;
-  document.getElementById('topicPageDesc').innerText = topic.description || '';
-  deleteTopicBtn.style.display = (topic.authorUid === currentUser.uid) ? 'inline-block' : 'none';
+  forumPage.classList.add('hidden');
+  topicPage.classList.remove('hidden');
+  topicPage.style.opacity = 1;
+  renderTopicPage(topicId);
+}
+backToForumBtn.addEventListener('click', ()=>{
+  topicPage.classList.add('hidden'); 
+  forumPage.classList.remove('hidden'); 
+  forumPage.style.opacity=1; 
+  currentTopicId=null; 
+  newPostContent.value=''; 
+  editorStatus.innerText='';
+});
 
-  const posts = topic.posts ? Object.entries(topic.posts)
-    .map(([id,p])=>({id,...p}))
-    .sort((a,b)=>b.timestamp-a.timestamp) : [];
+// --- Create Topic ---
+createTopicBtn.addEventListener('click', ()=>{
+  const valName = topicNameInput.value.trim();
+  if(!valName) return alert("Enter topic name");
+  const valDesc = topicDescInput.value.trim();
+  push(ref(db,'topics'),{
+    topicName: valName,
+    description: valDesc,
+    authorUid: currentUser.uid,
+    authorName: currentUserName,
+    timestamp: Date.now()
+  });
+  topicNameInput.value=''; topicDescInput.value='';
+});
 
-  postsContainer.innerHTML = '';
-  posts.forEach(p => renderPostRecursive(p, postsContainer, topicId));
+// --- Post ---
+postBtn.addEventListener('click', ()=>{
+  const val = newPostContent.value.trim();
+  if(!val) return alert("Enter post content");
+  push(ref(db,`topics/${currentTopicId}/posts`),{
+    authorName: currentUserName,
+    authorUid: currentUser.uid,
+    content: val,
+    timestamp: Date.now()
+  });
+  newPostContent.value='';
+  editorStatus.innerText='Posted';
+  setTimeout(()=>editorStatus.innerText='',1000);
+});
+
+// --- Render Topic Page ---
+function renderTopicPage(topicId){
+  const topic = topicsCache[topicId]; if(!topic) return;
+  topicPageName.innerText = topic.topicName;
+  topicPageDesc.innerText = topic.description || '';
+  deleteTopicBtn.style.display = (currentUserId===ADMIN_ID || topic.authorUid===currentUser.uid)?'inline-block':'none';
+  const posts = topic.posts ? Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp) : [];
+  postsContainer.innerHTML='';
+  posts.forEach(p=> renderPostRecursive(p, postsContainer, topicId));
 }
 
-// Recursive Post Renderer
+// --- Delete Topic ---
+deleteTopicBtn.addEventListener('click', ()=>{
+  const topic = topicsCache[currentTopicId];
+  if(!topic) return;
+  if(!(currentUserId===ADMIN_ID || topic.authorUid===currentUser.uid)) return alert("Cannot delete this topic");
+  if(confirm("Delete entire topic?")) remove(ref(db,`topics/${currentTopicId}`));
+});
+
+// --- Render Post Recursive ---
 function renderPostRecursive(post, parentElem, topicId){
-  const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid;
+  const topic = topicsCache[topicId];
+  const canDelete = currentUserId===ADMIN_ID || post.authorUid===currentUser.uid || topic.authorUid===currentUser.uid;
   const userLiked = post.likes && post.likes[currentUser.uid];
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
   const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 reply';
-
-  div.innerHTML = `
+  div.className='bg-gray-50 p-3 rounded shadow mt-2 reply';
+  div.innerHTML=`
     <div class="flex justify-between items-start post-actions">
       <div>
         <div class="font-medium text-gray-700">${escapeHtml(post.authorName||'Anonymous')}</div>
@@ -246,7 +268,7 @@ function renderPostRecursive(post, parentElem, topicId){
       <div class="flex gap-2 items-center">
         <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5 cursor-pointer"></i>
         <span class="text-sm">${likesCount}</span>
-        ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="w-5 h-5 text-red-500 cursor-pointer"></i>` : ''}
+        ${canDelete?`<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="w-5 h-5 text-red-500 cursor-pointer"></i>`:''}
       </div>
     </div>
     <div class="mt-2 text-gray-700 cursor-pointer" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
@@ -260,7 +282,6 @@ function renderPostRecursive(post, parentElem, topicId){
       </button>
     </div>
   `;
-
   parentElem.appendChild(div);
 
   // Click post to show reply box
@@ -270,7 +291,7 @@ function renderPostRecursive(post, parentElem, topicId){
     box.querySelector('input').focus();
   });
 
-  // Render replies recursively
+  // Render replies recursively (only admin can delete replies)
   if(post.replies){
     const toggleEl = div.querySelector(`#toggle-${post.id}`);
     const repliesEl = div.querySelector(`#replies-${post.id}`);
@@ -282,30 +303,15 @@ function renderPostRecursive(post, parentElem, topicId){
         ? `Show Replies (${Object.keys(post.replies).length})` 
         : 'Hide Replies';
     });
-    Object.entries(post.replies).forEach(([rid, rp])=>{
-      renderPostRecursive({...rp, id: rid}, repliesEl, topicId);
+    Object.entries(post.replies).forEach(([rid,rp])=>{
+      renderPostRecursive({...rp,id:rid}, repliesEl, topicId);
     });
   }
 
   lucide.createIcons();
 }
 
-// Submit new post
-postBtn.addEventListener('click', ()=>{
-  const val = newPostContent.value.trim();
-  if(!val) return alert("Enter post content");
-  push(ref(db, `topics/${currentTopicId}/posts`), {
-    authorName: currentUserName,
-    authorUid: currentUser.uid,
-    content: val,
-    timestamp: Date.now()
-  });
-  newPostContent.value='';
-  editorStatus.innerText='Posted';
-  setTimeout(()=>editorStatus.innerText='',1000);
-});
-
-// Submit reply
+// --- Submit Reply ---
 window.submitReply = function(postId, content){
   if(!content.trim()) return;
   push(ref(db, `topics/${currentTopicId}/posts/${postId}/replies`), {
@@ -316,23 +322,13 @@ window.submitReply = function(postId, content){
   });
 }
 
-// Like post
+// --- Like Post ---
 window.likePost = function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
   onValue(likeRef, snap=>{
-    snap.exists() ? remove(likeRef) : set(likeRef, true);
+    snap.exists()?remove(likeRef):set(likeRef,true);
   }, {onlyOnce:true});
 }
-
-// Delete post
-window.deletePost = function(postId){
-  if(!confirm("Delete this post?")) return;
-  remove(ref(db, `topics/${currentTopicId}/posts/${postId}`));
-}
-
-// Helper functions
-function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
-function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
 
 </script>
 </body>
