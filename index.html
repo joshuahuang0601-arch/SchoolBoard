@@ -109,7 +109,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, set, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, update, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -125,6 +125,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+
+let currentUser = null;
+let topicsCache = {};
+let favoritesCache = {};
+let draftsCache = {};
+let currentTopicId = null;
+let currentEditingDraftId = null;
 
 const welcome = document.getElementById('welcome-screen');
 const appRoot = document.getElementById('app');
@@ -155,25 +162,27 @@ const postsContainer = document.getElementById('postsContainer');
 const deleteAllPostsContainer = document.getElementById('deleteAllPostsContainer');
 const deleteAllPostsBtn = document.getElementById('deleteAllPostsBtn');
 
-let currentUser = null;
-let topicsCache = {};
-let favoritesCache = {};
-let draftsCache = {};
-let currentTopicId = null;
-let currentEditingDraftId = null;
+function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
+function timeAgo(ts){
+  const diff=(Date.now()-ts)/1000;
+  if(diff<60) return 'Just now';
+  if(diff<3600) return Math.floor(diff/60)+'m ago';
+  if(diff<86400) return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
 
 // ---------- Auth ----------
 let storedUid = localStorage.getItem('anonUid');
 if(!storedUid){
   signInAnonymously(auth).then(u=>{
     storedUid = u.user.uid;
-    localStorage.setItem('anonUid', storedUid);
+    localStorage.setItem('anonUid',storedUid);
     currentUser = u.user;
     userTag.innerText = `User: ${storedUid.slice(0,8)}`;
     initRealtime();
   }).catch(console.error);
 }else{
-  currentUser = {uid: storedUid};
+  currentUser = {uid:storedUid};
   userTag.innerText = `User: ${storedUid.slice(0,8)}`;
   initRealtime();
 }
@@ -193,34 +202,34 @@ welcome.addEventListener('click',()=>{
 // ---------- Realtime ----------
 function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
-    topicsCache = snap.val() || {};
+    topicsCache = snap.val()||{};
     renderTopics();
     renderFavoritesPanel();
   });
   onValue(ref(db,`favorites/${currentUser.uid}`),snap=>{
-    favoritesCache = snap.val() || {};
+    favoritesCache = snap.val()||{};
     renderTopics();
     renderFavoritesPanel();
   });
   onValue(ref(db,`drafts/${currentUser.uid}`),snap=>{
-    draftsCache = snap.val() || {};
+    draftsCache = snap.val()||{};
     renderDraftsList();
   });
 }
 
-// ---------- Forum ----------
+// ---------- Render Topics ----------
 function renderTopics(){
   const arr = Object.entries(topicsCache).map(([id,t])=>({id,...t}));
   arr.sort((a,b)=>{
-    const aFav = favoritesCache[a.id]?1:0;
-    const bFav = favoritesCache[b.id]?1:0;
-    if(aFav!==bFav) return bFav - aFav;
-    const aPosts = a.posts?Object.keys(a.posts).length:0;
-    const bPosts = b.posts?Object.keys(b.posts).length:0;
-    return bPosts - aPosts;
+    const aFav=favoritesCache[a.id]?1:0;
+    const bFav=favoritesCache[b.id]?1:0;
+    if(aFav!==bFav) return bFav-aFav;
+    const aPosts=a.posts?Object.keys(a.posts).length:0;
+    const bPosts=b.posts?Object.keys(b.posts).length:0;
+    return bPosts-aPosts;
   });
   forumContainer.innerHTML = arr.map(t=>{
-    const fav = favoritesCache[t.id]?true:false;
+    const fav=favoritesCache[t.id]?true:false;
     return `<div class="bg-white p-4 rounded-lg shadow flex justify-between items-center cursor-pointer">
       <div class="flex-1" onclick="openTopic('${t.id}')">
         <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
@@ -232,10 +241,8 @@ function renderTopics(){
   lucide.createIcons();
 }
 
-function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
-
 // ---------- Favorites ----------
-window.toggleFavorite = function(e,topicId){
+window.toggleFavorite=function(e,topicId){
   e.stopPropagation();
   const favRef = ref(db,`favorites/${currentUser.uid}/${topicId}`);
   if(favoritesCache[topicId]) remove(favRef);
@@ -248,11 +255,7 @@ closeFavorites.addEventListener('click',()=>{favoritesPanel.style.transform='tra
 function renderFavoritesPanel(){
   const arr = Object.entries(favoritesCache||{}).map(([id])=>({id,...(topicsCache[id]||{})}));
   if(arr.length===0){favoritesList.innerHTML='<p class="text-gray-500 text-center py-8">No favorites yet.</p>'; return;}
-  arr.sort((a,b)=>{
-    const aPosts = a.posts?Object.keys(a.posts).length:0;
-    const bPosts = b.posts?Object.keys(b.posts).length:0;
-    return bPosts - aPosts;
-  });
+  arr.sort((a,b)=>{const aPosts=a.posts?Object.keys(a.posts).length:0; const bPosts=b.posts?Object.keys(b.posts).length:0; return bPosts-aPosts;});
   favoritesList.innerHTML = arr.map(t=>{
     return `<div class="bg-white p-3 rounded shadow flex justify-between items-center cursor-pointer">
       <div class="flex-1" onclick="openTopic('${t.id}')">
@@ -269,21 +272,17 @@ function renderFavoritesPanel(){
 createTopicBtn.addEventListener('click',()=>{
   const name = topicNameInput.value.trim();
   if(!name) return alert("Enter topic name");
-  push(ref(db,'topics'),{
-    topicName: name,
-    author: "Anonymous",
-    timestamp: Date.now()
-  });
+  push(ref(db,'topics'),{topicName:name,author:"Anonymous",timestamp:Date.now()});
   topicNameInput.value='';
 });
 
 // ---------- Topic Modal ----------
-window.openTopic = function(topicId){
-  currentTopicId = topicId;
-  const topic = topicsCache[topicId];
-  topicModalName.innerText = topic.topicName;
+window.openTopic=function(topicId){
+  currentTopicId=topicId;
+  const topic=topicsCache[topicId];
+  topicModalName.innerText=topic.topicName;
   topicModal.classList.remove('hidden');
-  deleteAllPostsContainer.style.display = (topic.author===currentUser.uid)?'block':'none';
+  deleteAllPostsContainer.style.display=(topic.author===currentUser.uid)?'block':'none';
   newPostContent.value=''; editorStatus.innerText='';
   renderPosts();
 }
@@ -291,12 +290,12 @@ closeTopicModal.addEventListener('click',()=>{topicModal.classList.add('hidden')
 
 // ---------- Posts ----------
 function renderPosts(){
-  const topic = topicsCache[currentTopicId];
+  const topic=topicsCache[currentTopicId];
   if(!topic) return;
-  const posts = topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})):[];  
+  const posts=topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})):[];  
   posts.sort((a,b)=> (b.timestamp||0) - (a.timestamp||0));
   postsContainer.innerHTML = posts.map(p=>{
-    const canDelete = (p.authorUid===currentUser.uid) || (topic.author===currentUser.uid);
+    const canDelete=(p.authorUid===currentUser.uid)||(topic.author===currentUser.uid);
     return `<div class="bg-gray-50 p-3 rounded shadow">
       <div class="flex justify-between items-start">
         <div>
@@ -311,21 +310,21 @@ function renderPosts(){
 }
 
 postBtn.addEventListener('click',()=>{
-  const val = newPostContent.value.trim();
+  const val=newPostContent.value.trim();
   if(!val) return alert("Enter post content");
-  const postData = {authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()};
-  push(ref(db,`topics/${currentTopicId}/posts`),postData).then(()=>{newPostContent.value=''; editorStatus.innerText="Posted";});
+  push(ref(db,`topics/${currentTopicId}/posts`),{authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()});
+  newPostContent.value=''; editorStatus.innerText="Posted";
+});
+
+deleteAllPostsBtn.addEventListener('click',()=>{
+  if(!confirm("Delete all posts in this topic?")) return;
+  remove(ref(db,`topics/${currentTopicId}/posts`));
 });
 
 function deletePost(postId){
   if(!confirm("Delete this post?")) return;
   remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));
 }
-
-deleteAllPostsBtn.addEventListener('click',()=>{
-  if(!confirm("Delete all posts in this topic?")) return;
-  remove(ref(db,`topics/${currentTopicId}/posts`));
-});
 
 // ---------- Drafts ----------
 draftsBtn.addEventListener('click',()=>{draftsPanel.style.transform='translateX(0)'; renderDraftsList();});
@@ -335,9 +334,8 @@ newDraftBtn.addEventListener('click',()=>{
   draftsPanel.style.transform='translateX(100%)';
   topicModal.classList.remove('hidden');
 });
-
 saveDraftBtn.addEventListener('click',()=>{
-  const val = newPostContent.value.trim();
+  const val=newPostContent.value.trim();
   if(!val) return alert("Enter content");
   if(currentEditingDraftId){
     update(ref(db,`drafts/${currentUser.uid}/${currentEditingDraftId}`),{content:val,timestamp:Date.now()});
@@ -359,23 +357,14 @@ function renderDraftsList(){
   }).join('');
 }
 
-window.editDraft = function(draftId){
+window.editDraft=function(draftId){
   currentEditingDraftId=draftId;
   newPostContent.value=draftsCache[draftId].content;
   topicModal.classList.remove('hidden');
   draftsPanel.style.transform='translateX(100%)';
   editorStatus.innerText='Editing Draft';
 }
-window.deleteDraft = function(draftId){ remove(ref(db,`drafts/${currentUser.uid}/${draftId}`)); }
-
-// ---------- Utils ----------
-function timeAgo(ts){
-  const diff = (Date.now()-ts)/1000;
-  if(diff<60) return 'Just now';
-  if(diff<3600) return `${Math.floor(diff/60)}m ago`;
-  if(diff<86400) return `${Math.floor(diff/3600)}h ago`;
-  return `${Math.floor(diff/86400)}d ago`;
-}
+window.deleteDraft=function(draftId){ remove(ref(db,`drafts/${currentUser.uid}/${draftId}`)); }
 
 </script>
 <script>lucide.createIcons();</script>
