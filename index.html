@@ -159,6 +159,40 @@ userTag.addEventListener('click', ()=>{
     set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
   }
 });
+  userIdTag.addEventListener('click', async ()=>{
+  const newId = prompt("Enter new 12-character ID (letters + digits only):", currentUserId);
+  if(!newId) return;
+
+  // 验证长度和字符
+  const valid = /^[A-Za-z0-9]{12}$/.test(newId);
+  if(!valid){
+    return alert("ID must be exactly 12 characters and contain only letters and digits.");
+  }
+
+  // 检查是否已存在
+  const usersRef = ref(db, 'users');
+  try{
+    const snapshot = await get(usersRef);
+    const users = snapshot.val() || {};
+    const exists = Object.values(users).some(u => u.userId === newId);
+    if(exists){
+      return alert("This ID is already taken. Please choose another one.");
+    }
+
+    // 更新 Firebase
+    await set(ref(db, `users/${currentUser.uid}/userId`), newId);
+
+    // 更新本地存储和显示
+    currentUserId = newId;
+    localStorage.setItem('deviceId', newId);
+    userIdTag.innerText = newId;
+    alert("ID updated successfully!");
+  }catch(err){
+    console.error(err);
+    alert("Error updating ID.");
+  }
+});
+
 
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
