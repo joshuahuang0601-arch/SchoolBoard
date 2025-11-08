@@ -30,11 +30,6 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
     <div id="userTag" class="text-sm text-gray-600"></div>
   </div>
 
-  <!-- Search -->
-  <div class="mb-4">
-    <input id="search" type="text" placeholder="Search topics..." class="w-full px-4 py-2 border rounded-lg">
-  </div>
-
   <!-- Create Topic -->
   <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
     <h2 class="text-xl font-bold mb-4 text-gray-800">Create New Topic</h2>
@@ -103,7 +98,7 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 
 let currentUser=null;
-let currentUserName = localStorage.getItem('anonName') || '';
+let currentUserName = localStorage.getItem('anonName') || prompt("Enter your display name:", "Anonymous") || "Anonymous";
 localStorage.setItem('anonName', currentUserName);
 
 let topicsCache={};
@@ -133,31 +128,17 @@ userTag.innerText=`User: ${currentUserName}`;
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
 
-// ---------------- 用户登录并绑定昵称 ----------------
+// Auth
 let storedUid = localStorage.getItem('anonUid');
 if(!storedUid){
   signInAnonymously(auth).then(u=>{
-    currentUser=u.user;
-    storedUid=currentUser.uid;
+    storedUid=u.user.uid;
     localStorage.setItem('anonUid',storedUid);
-
-    if(!currentUserName){
-      currentUserName = prompt("Enter your display name:","Anonymous")||"Anonymous";
-      localStorage.setItem('anonName', currentUserName);
-    }
-
-    // 保存到数据库
-    set(ref(db, `users/${storedUid}`), { displayName: currentUserName, timestamp: Date.now() });
-
+    currentUser=u.user;
     initRealtime();
   }).catch(console.error);
 }else{
   currentUser={uid:storedUid};
-  if(!currentUserName){
-    currentUserName = prompt("Enter your display name:","Anonymous")||"Anonymous";
-    localStorage.setItem('anonName', currentUserName);
-  }
-  set(ref(db, `users/${storedUid}`), { displayName: currentUserName, timestamp: Date.now() });
   initRealtime();
 }
 
@@ -183,6 +164,180 @@ function initRealtime(){
     renderDrafts(snap.val()||{});
   });
 }
+
+// ---------- Forum ----------
+function renderForum(){
+  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=>{
+    const aFav=a.favorites&&a.favorites[currentUser.uid]?1:0;
+    const bFav=b.favorites&&b.favorites[currentUser.uid]?1:0;
+    if(aFav!==bFav) return bFav-aFav;
+    return (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0);
+  });
+  forumContainer.innerHTML=arr.map(t=>{
+    const topPosts=t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
+    const preview=topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
+    const fav=t.favorites&&t.favorites[currentUser.uid]?true:false;
+    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
+      <div>
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
+        ${preview}
+      </div>
+      <button onclick="toggleFavorite(event,'${t.id}')" class="px-2 py-1 rounded ${fav?'bg-yellow-400':'bg-gray-200'} hover:bg-yellow-300">★</button>
+    </div>`;
+  }).join('');
+}
+
+// Drafts
+function renderDrafts(draftsObj){
+  draftsContainer.innerHTML='';
+  for(const [id,d] of Object.entries(draftsObj||{})){
+    const div=document.createElement('div');
+    div.className='flex justify-between items-center bg-white p-2 mb-2 rounded shadow';
+    div.innerHTML=`<span>${escapeHtml(d.topicName)}${d.description?`: ${escapeHtml(d.description)}`:""}</span>
+    <div class="flex gap-1">
+      <button onclick="publishDraft('${id}')" class="bg-indigo-600 text-white px-2 py-1 rounded text-sm hover:bg-indigo-700">Publish</button>
+      <button onclick="deleteDraft('${id}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600">Delete</button>
+    </div>`;
+    draftsContainer.appendChild(div);
+  }
+}
+
+// Draft Handling
+createTopicBtn.addEventListener('click',()=>{createTopic(topicNameInput.value,topicDescInput.value);});
+saveDraftBtn.addEventListener('click',()=>{
+  const valName=topicNameInput.value.trim();
+  if(!valName) return alert("Enter topic name for draft");
+  const valDesc=topicDescInput.value.trim();
+  const draftRef=push(ref(db,`drafts/${currentUser.uid}`));
+  set(draftRef,{topicName:valName,description:valDesc,timestamp:Date.now()});
+  topicNameInput.value=''; topicDescInput.value='';
+});
+window.publishDraft=function(draftId){
+  const draftRef=ref(db,`drafts/${currentUser.uid}/${draftId}`);
+  onValue(draftRef,snap=>{
+    if(!snap.exists()) return;
+    const data=snap.val();
+    createTopic(data.topicName,data.description);
+    remove(draftRef);
+  },{onlyOnce:true});
+}
+window.deleteDraft=function(draftId){if(!confirm("Delete this draft?")) return; remove(ref(db,`drafts/${currentUser.uid}/${draftId}`));}
+
+// Favorite
+window.toggleFavorite=function(e,topicId){e.stopPropagation(); const favRef=ref(db,`topics/${topicId}/favorites/${currentUser.uid}`); onValue(favRef,snap=>{snap.exists()?remove(favRef):set(favRef,true);},{onlyOnce:true});}
+
+// Create Topic
+function createTopic(name,desc){push(ref(db,'topics'),{topicName:name,description:desc,authorUid:currentUser.uid,authorName:currentUserName,timestamp:Date.now()}); topicNameInput.value=''; topicDescInput.value='';}
+
+// Open Topic
+window.openTopic=function(topicId){currentTopicId=topicId; forumPage.classList.add('hidden'); topicPage.classList.remove('hidden'); topicPage.style.opacity=1; renderTopicPage(topicId);}
+backToForumBtn.addEventListener('click',()=>{topicPage.classList.add('hidden'); forumPage.classList.remove('hidden'); forumPage.style.opacity=1; currentTopicId=null; newPostContent.value=''; editorStatus.innerText='';});
+
+// Render Topic Page
+function renderTopicPage(topicId){
+  const topic=topicsCache[topicId]; if(!topic) return;
+  topicPageName.innerText=topic.topicName; topicPageDesc.innerText=topic.description||'';
+  deleteTopicBtn.style.display=(topic.authorUid===currentUser.uid)?'inline-block':'none';
+  const posts = topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp):[];
+  postsContainer.innerHTML='';
+  posts.forEach(p=>{renderPostRecursive(p,postsContainer,topicId)});
+}
+
+// Recursive Post Rendering with Collapse
+function renderPostRecursive(post,parentElem,topicId){
+  const canDelete=post.authorUid===currentUser.uid || topicsCache[topicId].authorUid===currentUser.uid;
+  const userLiked=post.likes && post.likes[currentUser.uid]?true:false;
+  const likesCount=post.likes?Object.keys(post.likes).length:0;
+
+  const div=document.createElement('div');
+  div.className='bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  
+  div.innerHTML=`
+    <div class="flex justify-between items-start" id="postHeader-${post.id}">
+      <div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
+      </div>
+      <div class="flex gap-2">
+        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete?`<button onclick="deletePost('${post.id}')" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm">Delete</button>`:''}
+      </div>
+    </div>
+    <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
+    <span class="collapse-toggle hidden" id="toggle-${post.id}">Show Replies</span>
+    <div id="replies-${post.id}" class="mt-2 hidden"></div>
+    <div id="replyBox-${post.id}" class="mt-2 hidden">
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
+             onkeypress="if(event.key==='Enter'){submitReply('${post.id}',this.value); this.value=''; this.parentElement.classList.add('hidden');}">
+      <p class="text-xs text-gray-400 mt-1">Press Enter to submit</p>
+    </div>
+  `;
+  parentElem.appendChild(div);
+
+  const postContentEl = div.querySelector(`#postContent-${post.id}`);
+  const repliesEl = div.querySelector(`#replies-${post.id}`);
+  const toggleEl = div.querySelector(`#toggle-${post.id}`);
+  postContentEl.addEventListener('click',()=>{ 
+    const box = document.getElementById(`replyBox-${post.id}`);
+    box.classList.remove('hidden'); 
+    box.querySelector('input').focus();
+  });
+
+  // Render Replies
+  if(post.replies){
+    toggleEl.classList.remove('hidden');
+    toggleEl.addEventListener('click',()=>{
+      repliesEl.classList.toggle('hidden');
+      toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
+    });
+    Object.entries(post.replies).forEach(([rid,rp])=>renderPostRecursive({...rp,id:rid},repliesEl,topicId));
+    toggleEl.innerText=`Show Replies (${Object.keys(post.replies).length})`;
+  }
+
+  lucide.createIcons();
+}
+
+// Submit Reply
+window.submitReply=function(postId,content){
+  if(!content.trim()) return;
+  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
+    authorName: currentUserName,
+    authorUid: currentUser.uid,
+    content: content,
+    timestamp: Date.now()
+  });
+}
+
+// Post / Like / Delete
+postBtn.addEventListener('click',()=>{
+  const val=newPostContent.value.trim(); 
+  if(!val) return alert("Enter post content"); 
+  push(ref(db,`topics/${currentTopicId}/posts`),{authorName:currentUserName,authorUid:currentUser.uid,content:val,timestamp:Date.now()}); 
+  newPostContent.value=''; editorStatus.innerText='Posted'; 
+  setTimeout(()=>editorStatus.innerText='',1000);
+});
+
+window.likePost=function(postId){
+  const likeRef=ref(db,`topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
+  onValue(likeRef,snap=>{
+    snap.exists()?remove(likeRef):set(likeRef,true);
+  },{onlyOnce:true});
+}
+
+window.deletePost=function(postId){
+  if(!confirm("Delete this post?")) return;
+  remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));
+}
+
+deleteTopicBtn.addEventListener('click',()=>{
+  if(!confirm("Delete entire topic?")) return;
+  remove(ref(db,`topics/${currentTopicId}`));
+  currentTopicId=null; topicPage.classList.add('hidden'); forumPage.classList.remove('hidden');
+});
+
 </script>
 </body>
 </html>
