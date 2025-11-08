@@ -307,9 +307,8 @@ function renderPostRecursive(post, parentElem, topicId) {
     <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
     <div id="replies-${post.id}" class="mt-2 ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? '' : 'hidden'}"></div>
     <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
-      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
-             onkeypress="if(event.key==='Enter'){submitReply('${post.id}',this.value); this.value=''; this.parentElement.classList.add('hidden');}">
-      <button onclick="submitReply('${post.id}', this.parentElement.querySelector('input').value)" class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
+      <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
     </div>
   `;
   parentElem.appendChild(div);
@@ -317,16 +316,27 @@ function renderPostRecursive(post, parentElem, topicId) {
   const postContentEl = div.querySelector(`#postContent-${post.id}`);
   const repliesEl = div.querySelector(`#replies-${post.id}`);
   const toggleEl = div.querySelector(`#toggle-${post.id}`);
+  const replyBox = div.querySelector(`#replyBox-${post.id}`);
+  const replyInput = replyBox.querySelector('input');
+  const sendBtn = replyBox.querySelector('button');
 
   // 点击内容显示 reply 输入框
   postContentEl.addEventListener('click', () => {
-    const box = document.getElementById(`replyBox-${post.id}`);
-    box.classList.remove('hidden');
-    box.querySelector('input').focus();
+    replyBox.classList.remove('hidden');
+    replyInput.focus();
   });
 
-  // 展开/折叠回复
+  // 发送按钮点击
+  sendBtn.addEventListener('click', () => {
+    if (!replyInput.value.trim()) return;
+    submitReply(post.id, replyInput.value);
+    replyInput.value = '';
+    replyBox.classList.add('hidden');
+  });
+
+  // 回复展开/折叠
   if (post.replies) {
+    toggleEl.classList.remove('hidden');
     toggleEl.addEventListener('click', () => {
       const expanded = !repliesEl.classList.contains('hidden');
       repliesEl.classList.toggle('hidden');
@@ -334,12 +344,13 @@ function renderPostRecursive(post, parentElem, topicId) {
       localStorage.setItem(`repliesExpanded-${post.id}`, !expanded);
     });
 
+    // 递归渲染子回复
     Object.entries(post.replies).forEach(([rid, rp]) => {
       renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, post.id, 1);
     });
   }
 
-  lucide.createIcons();
+  lucide.createIcons(); //渲染图标一次
 }
 
 // ---------- Recursive Reply Rendering ----------
@@ -349,7 +360,7 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
 
   const div = document.createElement('div');
-  div.className = `bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply`;
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
   div.style.marginLeft = `${level * 1}rem`; // 控制缩进
   div.innerHTML = `
     <div class="flex justify-between items-start">
@@ -380,16 +391,14 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   lucide.createIcons();
 }
 
+
 // ---------- Like Reply ----------
-window.likeReply = async function(postId, replyId){
+window.likeReply = function(postId, replyId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
-  const snap = await get(likeRef);
-  if(snap.exists()){
-    remove(likeRef);
-  } else {
-    set(likeRef, true);
-  }
-}
+  likeRef.transaction(current => current ? null : true)
+    .then(() => console.log("Reply like toggled"))
+    .catch(err => console.error("Error toggling like:", err));
+};
 
 // ---------- Delete Reply ----------
 window.deleteReply = async function(postId, replyId){
@@ -443,14 +452,11 @@ postBtn.addEventListener('click', ()=>{
 });
 
 
-window.likePost = async function(postId){
+window.likePost = function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  const snap = await get(likeRef);
-  if(snap.exists()){
-    remove(likeRef);
-  } else {
-    set(likeRef, true);
-  }
+  likeRef.transaction(current => current ? null : true)
+    .then(() => console.log("Post like toggled"))
+    .catch(err => console.error("Error toggling like:", err));
 };
 
 window.deletePost = function(postId){
