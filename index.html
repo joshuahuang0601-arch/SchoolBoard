@@ -147,26 +147,6 @@ const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 const userIdTag = document.getElementById('userIdTag');
 
-// 点赞帖子
-window.toggleLikePost = function(postId){
-  if(!currentUser?.uid) return; // 确保用户已登录
-  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  get(likeRef).then(snap => {
-    if(snap.exists()) remove(likeRef);
-    else set(likeRef, true);
-  });
-};
-
-// 点赞回复
-window.toggleLikeReply = function(postId, replyId){
-  if(!currentUser?.uid) return;
-  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
-  get(likeRef).then(snap => {
-    if(snap.exists()) remove(likeRef);
-    else set(likeRef, true);
-  });
-};
-
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
   
@@ -308,11 +288,6 @@ function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
-const likeIcon = document.createElement('i');
-likeIcon.setAttribute('data-lucide','thumbs-up');
-likeIcon.className = `${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5 cursor-pointer`;
-likeIcon.addEventListener('click', ()=>toggleLikePost(post.id));
-actionsEl.prepend(likeIcon);
 
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
@@ -398,7 +373,7 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   parentElem.appendChild(div);
 
   const repliesEl = div.querySelector(`#replies-${reply.id}`);
-likeIcon.addEventListener('click', ()=>toggleLikeReply(parentPostId, reply.id));
+
   if (reply.replies) {
     Object.entries(reply.replies).forEach(([rid, rp]) => {
       renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
