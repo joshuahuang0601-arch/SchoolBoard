@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,40 +15,25 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 .collapse-toggle { font-size:0.8rem; color:#555; cursor:pointer; margin-left:0.5rem; }
 .post-actions i { transition: color 0.2s; }
 .post-actions i:hover { transform: scale(1.1); }
-.collapse-all-btn { 
-  position:absolute; 
-  top:0.5rem; 
-  right:0.5rem; 
-  background:#e0e7ff; 
-  border-radius:50%; 
-  width:28px; 
-  height:28px; 
-  display:flex; 
-  align-items:center; 
-  justify-content:center; 
-  cursor:pointer; 
-  transition:background 0.2s;
-}
-.collapse-all-btn:hover { background:#c7d2fe; }
 @media(max-width:768px){ .reply{margin-left:0.5rem;} }
 </style>
 </head>
 <body class="min-h-screen">
 
-<!-- 欢迎屏幕 -->
+<!-- Welcome Screen -->
 <div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40">
   <h1 class="text-5xl font-bold text-indigo-700 select-none mb-4">Welcome to SchoolBoard Forum!</h1>
-  <p class="text-gray-600 text-lg animate-pulse">点击任意位置进入</p>
+  <p class="text-gray-600 text-lg animate-pulse">Click anywhere to enter</p>
 </div>
 
-<!-- 论坛页 -->
+<!-- Forum Page -->
 <div id="forumPage" class="hidden fade opacity-0 max-w-6xl mx-auto px-4 py-8">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-800">SchoolBoard Forum</h1>
-    <div id="userTag" class="text-sm text-gray-600"></div>
+    <div id="userTag" class="text-sm text-gray-600 cursor-pointer"></div>
   </div>
 
-  <!-- 创建话题 -->
+  <!-- Create Topic -->
   <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
     <h2 class="text-xl font-bold mb-4 text-gray-800">Create New Topic</h2>
     <input id="topicName" placeholder="Topic name" class="w-full px-4 py-2 border rounded-lg mb-2">
@@ -59,17 +44,17 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
     </div>
   </div>
 
-  <!-- 草稿 -->
+  <!-- Drafts Panel -->
   <div id="draftsPanel" class="bg-gray-50 p-4 rounded-lg mb-6">
     <h3 class="font-bold text-gray-700 mb-2">Your Drafts</h3>
     <div id="draftsContainer"></div>
   </div>
 
-  <!-- 话题列表 -->
+  <!-- Topics List -->
   <div id="forumContainer" class="space-y-4"></div>
 </div>
 
-<!-- 话题页 -->
+<!-- Topic Page -->
 <div id="topicPage" class="hidden fade opacity-0 max-w-6xl mx-auto px-4 py-8">
   <div class="flex justify-between items-center mb-6">
     <button id="backToForumBtn" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 flex items-center gap-2">
@@ -77,22 +62,22 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
     </button>
     <div class="flex items-center gap-2">
       <span id="topicPageName" class="text-xl font-bold"></span>
-      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 hidden text-sm">Delete Topic</button>
+      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">Delete Topic</button>
     </div>
   </div>
 
   <p id="topicPageDesc" class="text-gray-600 mb-4"></p>
 
-  <!-- 新帖子 -->
-  <div class="mb-4">
-    <textarea id="newPostContent" placeholder="Write your post..." rows="3" class="w-full px-4 py-2 border rounded-lg mb-2 resize-none"></textarea>
-    <div class="flex gap-2">
-      <button id="postBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Post</button>
-      <span id="editorStatus" class="text-sm text-gray-500 ml-2"></span>
-    </div>
+  <!-- New Post -->
+  <div class="mb-4 flex gap-2">
+    <textarea id="newPostContent" placeholder="Write your post..." rows="2" class="flex-1 px-4 py-2 border rounded-lg resize-none"></textarea>
+    <button id="postBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+      <i data-lucide="send" class="w-5 h-5"></i>
+    </button>
   </div>
+  <span id="editorStatus" class="text-sm text-gray-500 mb-4 block"></span>
 
-  <!-- 帖子列表 -->
+  <!-- Posts List -->
   <div id="postsContainer" class="space-y-3"></div>
 </div>
 
@@ -140,7 +125,17 @@ const newPostContent=document.getElementById('newPostContent');
 const postBtn=document.getElementById('postBtn');
 const editorStatus=document.getElementById('editorStatus');
 const userTag=document.getElementById('userTag');
-userTag.innerText=`User: ${currentUserName}`;
+
+// User name clickable
+userTag.innerText = `User: ${currentUserName}`;
+userTag.addEventListener('click', ()=>{
+  const newName = prompt("Enter your display name:", currentUserName);
+  if(newName && newName.trim()){
+    currentUserName = newName.trim();
+    localStorage.setItem('anonName', currentUserName);
+    userTag.innerText = `User: ${currentUserName}`;
+  }
+});
 
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
@@ -179,6 +174,45 @@ function initRealtime(){
   });
 }
 
+// --- Forum, Drafts, Topics ---
+function renderForum(){
+  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=> (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0));
+  forumContainer.innerHTML=arr.map(t=>{
+    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
+      <div>
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDrafts(draftsObj){
+  draftsContainer.innerHTML='';
+  for(const [id,d] of Object.entries(draftsObj||{})){
+    const div=document.createElement('div');
+    div.className='flex justify-between items-center bg-white p-2 mb-2 rounded shadow';
+    div.innerHTML=`<span>${escapeHtml(d.topicName)}${d.description?`: ${escapeHtml(d.description)}`:""}</span>
+    <div class="flex gap-1">
+      <button onclick="publishDraft('${id}')" class="bg-indigo-600 text-white px-2 py-1 rounded text-sm hover:bg-indigo-700">Publish</button>
+      <button onclick="deleteDraft('${id}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600">Delete</button>
+    </div>`;
+    draftsContainer.appendChild(div);
+  }
+}
+
+window.publishDraft=function(draftId){
+  const draftRef=ref(db,`drafts/${currentUser.uid}/${draftId}`);
+  onValue(draftRef,snap=>{
+    if(!snap.exists()) return;
+    const data=snap.val();
+    createTopic(data.topicName,data.description);
+    remove(draftRef);
+  },{onlyOnce:true});
+}
+window.deleteDraft=function(draftId){if(!confirm("Delete this draft?")) return; remove(ref(db,`drafts/${currentUser.uid}/${draftId}`));}
+
 createTopicBtn.addEventListener('click',()=>{createTopic(topicNameInput.value,topicDescInput.value);});
 saveDraftBtn.addEventListener('click',()=>{
   const valName=topicNameInput.value.trim();
@@ -194,89 +228,95 @@ function createTopic(name,desc){push(ref(db,'topics'),{topicName:name,descriptio
 window.openTopic=function(topicId){currentTopicId=topicId; forumPage.classList.add('hidden'); topicPage.classList.remove('hidden'); topicPage.style.opacity=1; renderTopicPage(topicId);}
 backToForumBtn.addEventListener('click',()=>{topicPage.classList.add('hidden'); forumPage.classList.remove('hidden'); forumPage.style.opacity=1; currentTopicId=null; newPostContent.value=''; editorStatus.innerText='';});
 
+// Delete topic (all users)
+deleteTopicBtn.style.display = 'inline-block';
+deleteTopicBtn.addEventListener('click', ()=>{
+  if(!confirm("Delete entire topic?")) return;
+  remove(ref(db, `topics/${currentTopicId}`));
+  currentTopicId=null; topicPage.classList.add('hidden'); forumPage.classList.remove('hidden');
+});
+
+// Post + replies
+postBtn.addEventListener('click', submitNewPost);
+newPostContent.addEventListener('keypress', e=>{if(e.key==='Enter' && !e.shiftKey){submitNewPost(); e.preventDefault();}});
+
+function submitNewPost(){
+  const val = newPostContent.value.trim();
+  if(!val) return;
+  push(ref(db,`topics/${currentTopicId}/posts`),{authorName:currentUserName,authorUid:currentUser.uid,content:val,timestamp:Date.now()});
+  newPostContent.value='';
+  editorStatus.innerText='Posted';
+  setTimeout(()=>editorStatus.innerText='',1000);
+}
+
+// Render topic page
 function renderTopicPage(topicId){
   const topic=topicsCache[topicId]; if(!topic) return;
   topicPageName.innerText=topic.topicName; topicPageDesc.innerText=topic.description||'';
-  deleteTopicBtn.style.display=(topic.authorUid===currentUser.uid)?'inline-block':'none';
-  const posts = topic.posts ? Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp) : [];
+  const posts = topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp):[];
   postsContainer.innerHTML='';
-  posts.forEach(p=>renderPostRecursive(p,postsContainer,topicId));
+  posts.forEach(p=>{renderPostRecursive(p,postsContainer,topicId)});
 }
 
-// 递归渲染帖子与回复，带折叠按钮和发送按钮
-function renderPostRecursive(post, parentElem, topicId, parentPath='posts'){
-  const postPath = `${parentPath}/${post.id}`;
-  const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid;
-  const userLiked = post.likes && post.likes[currentUser.uid];
-  const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+// Recursive posts with replies
+function renderPostRecursive(post,parentElem,topicId){
+  const canDelete=post.authorUid===currentUser.uid || topicsCache[topicId].authorUid===currentUser.uid;
+  const userLiked=post.likes && post.likes[currentUser.uid]?true:false;
+  const likesCount=post.likes?Object.keys(post.likes).length:0;
 
-  const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 reply';
-  div.innerHTML = `
-    <div class="flex justify-between items-start flex-wrap md:flex-nowrap">
+  const div=document.createElement('div');
+  div.className='bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  div.innerHTML=`
+    <div class="flex justify-between items-start" id="postHeader-${post.id}">
       <div>
         <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
         <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
       </div>
-      <div class="flex gap-3 mt-2 md:mt-0 post-actions">
-        <i onclick="likePost('${postPath}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5 cursor-pointer"></i>
-        <span class="text-sm mt-1">${likesCount}</span>
-        ${canDelete?`<i onclick="deletePost('${postPath}')" data-lucide="trash-2" class="text-red-500 w-5 h-5 cursor-pointer"></i>`:''}
+      <div class="flex gap-2 post-actions">
+        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete?`<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-500 w-5 h-5 cursor-pointer"></i>`:''}
       </div>
     </div>
     <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
     <span class="collapse-toggle hidden" id="toggle-${post.id}">Show Replies</span>
     <div id="replies-${post.id}" class="mt-2 hidden"></div>
-    <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1 items-center">
-      <input id="replyInput-${post.id}" placeholder="Reply..." class="flex-1 px-2 py-1 border rounded"
-             onkeypress="if(event.key==='Enter'){submitReply('${postPath}', this.value); this.value=''; this.parentElement.classList.add('hidden');}">
-      <button class="px-2 py-1 bg-indigo-500 rounded text-white hover:bg-indigo-600" 
-              onclick="submitReply('${postPath}', document.getElementById('replyInput-${post.id}').value); document.getElementById('replyInput-${post.id}').value='';">
-        <i data-lucide='send' class='w-4 h-4'></i>
+    <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
+             onkeypress="if(event.key==='Enter'){submitReply('${post.id}',this.value); this.value=''; this.parentElement.classList.add('hidden');}">
+      <button onclick="submitReply('${post.id}', this.previousElementSibling.value)" class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700">
+        <i data-lucide="send" class="w-4 h-4"></i>
       </button>
-    </div>
-    <div class="collapse-all-btn hidden" id="collapseAll-${post.id}" title="折叠/展开所有回复">
-      <i data-lucide="chevron-up" class="w-4 h-4"></i>
     </div>
   `;
   parentElem.appendChild(div);
 
   const postContentEl = div.querySelector(`#postContent-${post.id}`);
-  const replyBoxEl = div.querySelector(`#replyBox-${post.id}`);
   const repliesEl = div.querySelector(`#replies-${post.id}`);
   const toggleEl = div.querySelector(`#toggle-${post.id}`);
-  const collapseAllEl = div.querySelector(`#collapseAll-${post.id}`);
+  postContentEl.addEventListener('click',()=>{ 
+    const box = document.getElementById(`replyBox-${post.id}`);
+    box.classList.remove('hidden'); 
+    box.querySelector('input').focus();
+  });
 
-  postContentEl.addEventListener('click',()=>{ replyBoxEl.classList.remove('hidden'); replyBoxEl.querySelector('input').focus(); });
-
+  // Render replies
   if(post.replies){
     toggleEl.classList.remove('hidden');
-    Object.entries(post.replies).forEach(([rid, rp]) => 
-      renderPostRecursive({...rp, id: rid}, repliesEl, topicId, `${postPath}/replies`)
-    );
-    toggleEl.innerText = `Show Replies (${Object.keys(post.replies).length})`;
-
-    toggleEl.addEventListener('click', ()=>{
-      const hidden = repliesEl.classList.toggle('hidden');
-      toggleEl.innerText = hidden ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-      collapseAllEl.style.display = hidden ? 'none' : 'flex';
+    toggleEl.addEventListener('click',()=>{
+      repliesEl.classList.toggle('hidden');
+      toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
     });
-
-    collapseAllEl.style.display = 'flex';
-    collapseAllEl.addEventListener('click', ()=>{
-      const hidden = !repliesEl.classList.contains('hidden');
-      repliesEl.classList.toggle('hidden', hidden);
-      toggleEl.innerText = hidden ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-    });
+    Object.entries(post.replies).forEach(([rid,rp])=>renderPostRecursive({...rp,id:rid},repliesEl,topicId));
+    toggleEl.innerText=`Show Replies (${Object.keys(post.replies).length})`;
   }
 
   lucide.createIcons();
 }
 
-// 提交回复
-window.submitReply=function(postPath, content){
+window.submitReply=function(postId,content){
   if(!content.trim()) return;
-  push(ref(db, `topics/${currentTopicId}/${postPath}/replies`), {
+  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
     authorName: currentUserName,
     authorUid: currentUser.uid,
     content: content,
@@ -284,33 +324,17 @@ window.submitReply=function(postPath, content){
   });
 }
 
-// 发布帖子
-postBtn.addEventListener('click', ()=>{
-  const val = newPostContent.value.trim(); 
-  if(!val) return alert("Enter post content"); 
-  push(ref(db, `topics/${currentTopicId}/posts`), {authorName: currentUserName, authorUid: currentUser.uid, content: val, timestamp: Date.now()}); 
-  newPostContent.value=''; editorStatus.innerText='Posted'; 
-  setTimeout(()=>editorStatus.innerText='',1000);
-});
-
-// 点赞
-window.likePost = function(postPath){
-  const likeRef = ref(db, `topics/${currentTopicId}/${postPath}/likes/${currentUser.uid}`);
-  onValue(likeRef, snap => { snap.exists()?remove(likeRef):set(likeRef,true); }, {onlyOnce:true});
+window.likePost=function(postId){
+  const likeRef=ref(db,`topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
+  onValue(likeRef,snap=>{
+    snap.exists()?remove(likeRef):set(likeRef,true);
+  },{onlyOnce:true});
 }
 
-// 删除帖子/回复
-window.deletePost = function(path){
+window.deletePost=function(postId){
   if(!confirm("Delete this post?")) return;
-  remove(ref(db, `topics/${currentTopicId}/${path}`));
+  remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));
 }
-
-// 删除话题
-deleteTopicBtn.addEventListener('click', ()=>{
-  if(!confirm("Delete entire topic?")) return;
-  remove(ref(db, `topics/${currentTopicId}`));
-  currentTopicId=null; topicPage.classList.add('hidden'); forumPage.classList.remove('hidden');
-});
 </script>
 </body>
 </html>
