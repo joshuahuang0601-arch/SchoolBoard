@@ -11,6 +11,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 .fade { transition: opacity 0.4s ease; }
 .hidden { display: none; }
 .reply { margin-left: 1rem; border-left: 2px solid #ddd; padding-left:0.5rem; margin-top:0.5rem; }
+.cursor-pointer { cursor: pointer; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -245,37 +246,64 @@ function renderTopicPage(topicId){
 // ---------- Recursive Post Rendering ----------
 function renderPostRecursive(post,parentElem,topicId){
   const canDelete=post.authorUid===currentUser.uid || topicsCache[topicId].authorUid===currentUser.uid;
+  const userLiked=post.likes && post.likes[currentUser.uid]?true:false;
   const likesCount=post.likes?Object.keys(post.likes).length:0;
+
   const div=document.createElement('div');
-  div.className='bg-gray-50 p-3 rounded shadow mt-2';
-  div.innerHTML=`<div class="flex justify-between items-start">
-    <div>
-      <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
-      <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
+  div.className='bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer';
+  
+  div.innerHTML=`
+    <div class="flex justify-between items-start" id="postHeader-${post.id}">
+      <div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
+      </div>
+      <div class="flex gap-2">
+        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete?`<button onclick="deletePost('${post.id}')" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm">Delete</button>`:''}
+      </div>
     </div>
-    <div class="flex gap-2">
-      <button onclick="likePost('${post.id}')" class="text-indigo-600 text-sm">❤️ ${likesCount}</button>
-      ${canDelete?`<button onclick="deletePost('${post.id}')" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm">Delete</button>`:''}
+    <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
+    <div id="replies-${post.id}" class="mt-2"></div>
+    <div id="replyBox-${post.id}" class="mt-2 hidden">
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
+             onkeypress="if(event.key==='Enter'){submitReply('${post.id}',this.value); this.value=''; this.parentElement.classList.add('hidden');}">
+      <p class="text-xs text-gray-400 mt-1">Press Enter to submit</p>
     </div>
-  </div>
-  <div class="mt-2 text-gray-700">${escapeHtml(post.content)}</div>
-  <div id="replies-${post.id}" class="mt-2"></div>
-  <div class="flex gap-2 mt-2">
-    <input id="replyInput-${post.id}" placeholder="Reply..." class="flex-1 px-2 py-1 border rounded">
-    <button onclick="addReply('${post.id}')" class="bg-gray-200 px-3 py-1 rounded hover:bg-gray-300 text-sm">Reply</button>
-  </div>`;
+  `;
   parentElem.appendChild(div);
+
+  const postContentEl = div.querySelector(`#postContent-${post.id}`);
+  postContentEl.addEventListener('click',()=>{ 
+    const box = document.getElementById(`replyBox-${post.id}`);
+    box.classList.remove('hidden'); 
+    box.querySelector('input').focus();
+  });
+
   if(post.replies) Object.entries(post.replies).forEach(([rid,rp])=>renderPostRecursive({...rp,id:rid},div.querySelector(`#replies-${post.id}`),topicId));
+
+  lucide.createIcons();
 }
 
-// ---------- Post / Reply ----------
+// ---------- Submit Reply ----------
+window.submitReply=function(postId,content){
+  if(!content.trim()) return;
+  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
+    authorName:"Anonymous",
+    authorUid:currentUser.uid,
+    content:content,
+    timestamp:Date.now()
+  });
+}
+
+// ---------- Post / Like / Delete ----------
 postBtn.addEventListener('click',()=>{const val=newPostContent.value.trim(); if(!val) return alert("Enter post content"); push(ref(db,`topics/${currentTopicId}/posts`),{authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()}); newPostContent.value=''; editorStatus.innerText="Posted";});
-window.addReply=function(postId,parentReplyId=null){const input=document.getElementById(parentReplyId?`replyInput-${parentReplyId}`:`replyInput-${postId}`); const val=input.value.trim(); if(!val) return; if(parentReplyId){push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies/${parentReplyId}`),{authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()});}else{push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()});} input.value='';}
-window.likePost=function(postId){const postRef=ref(db,`topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`); onValue(postRef,snap=>{snap.exists()?remove(postRef):set(postRef,true);},{onlyOnce:true});}
+window.likePost=function(postId){const likeRef=ref(db,`topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`); onValue(likeRef,snap=>{snap.exists()?remove(likeRef):set(likeRef,true);},{onlyOnce:true});}
 window.deletePost=function(postId){if(!confirm("Delete this post?")) return; remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));}
-deleteTopicBtn.addEventListener('click',()=>{if(!confirm("Delete this topic and all posts?")) return; remove(ref(db,`topics/${currentTopicId}`)); topicPage.classList.add('hidden'); forumPage.classList.remove('hidden'); forumPage.style.opacity=1; currentTopicId=null; newPostContent.value=''; editorStatus.innerText='';});
+deleteTopicBtn.addEventListener('click',()=>{if(!confirm("Delete this topic and all posts?")) return; remove(ref(db,`topics/${currentTopicId}`)); backToForumBtn.click();});
 
 </script>
-<script>lucide.createIcons();</script>
+<script>window.addEventListener('load',()=>{lucide.createIcons();});</script>
 </body>
 </html>
