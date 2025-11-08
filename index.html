@@ -297,9 +297,11 @@ function renderTopicPage(topicId){
 }
 
 function renderPostRecursive(post, parentElem, topicId){
-  const canDelete = post.authorUid===currentUser.uid || topicsCache[topicId].authorUid===currentUser.uid || isAdmin();
+  const topic = topicsCache[topicId];
+  const canDelete = post.authorUid===currentUser.uid || topic.authorUid===currentUser.uid || isAdmin();
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
+  // 创建帖子容器
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
   div.innerHTML = `
@@ -323,9 +325,15 @@ function renderPostRecursive(post, parentElem, topicId){
     </div>
   `;
   parentElem.appendChild(div);
-  lucide.createIcons();
+  lucide.createIcons(); // 渲染图标
 
   const replyContainer = div.querySelector('.reply-container');
+  const replyBox = div.querySelector('.reply-box');
+  const replyInput = replyBox.querySelector('input');
+  const sendBtn = replyBox.querySelector('button');
+  const toggleBtn = div.querySelector('.collapse-toggle');
+  const likeBtn = div.querySelector('i[data-lucide="thumbs-up"]');
+  const delBtn = div.querySelector('i[data-lucide="trash-2"]');
 
   // 递归渲染子回复
   if(post.replies){
@@ -335,7 +343,6 @@ function renderPostRecursive(post, parentElem, topicId){
   }
 
   // 点赞
-  const likeBtn = div.querySelector('i[data-lucide="thumbs-up"]');
   likeBtn.addEventListener('click', e=>{
     e.stopPropagation();
     const likeRef = ref(db, `topics/${currentTopicId}/posts/${post.id}/likes/${currentUser.uid}`);
@@ -343,7 +350,6 @@ function renderPostRecursive(post, parentElem, topicId){
   });
 
   // 删除
-  const delBtn = div.querySelector('i[data-lucide="trash-2"]');
   if(delBtn){
     delBtn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -351,14 +357,13 @@ function renderPostRecursive(post, parentElem, topicId){
     });
   }
 
-  // 回复框
-  const replyBox = div.querySelector('.reply-box');
-  const replyInput = replyBox.querySelector('input');
-  const sendBtn = replyBox.querySelector('button');
+  // 点击帖子显示回复框
   div.querySelector('.mt-2.text-gray-700').addEventListener('click', ()=>{
     replyBox.classList.remove('hidden');
     replyInput.focus();
   });
+
+  // 发送回复
   sendBtn.addEventListener('click', ()=>{
     const val = replyInput.value.trim();
     if(!val) return;
@@ -372,8 +377,7 @@ function renderPostRecursive(post, parentElem, topicId){
     replyBox.classList.add('hidden');
   });
 
-  // 折叠回复
-  const toggleBtn = div.querySelector('.collapse-toggle');
+  // 折叠/展开回复
   toggleBtn.addEventListener('click', e=>{
     e.stopPropagation();
     const expanded = replyContainer.classList.toggle('expanded');
@@ -381,6 +385,7 @@ function renderPostRecursive(post, parentElem, topicId){
     toggleBtn.innerText = expanded ? `Hide Replies (${Object.keys(post.replies||{}).length})` : `Show Replies (${Object.keys(post.replies||{}).length})`;
   });
 }
+
 
 postBtn.addEventListener('click', ()=>{
   const content = newPostContent.value.trim();
