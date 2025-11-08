@@ -7,543 +7,282 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    body {
-      background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+    body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); min-height: 100vh; overflow-x: hidden; }
     .fade { transition: opacity 0.45s ease; }
     .hidden { display: none; }
-    /* simple panel animation */
-    .panel-enter { transform: translateX(12px); opacity: 0; }
-    .panel-enter-active { transform: translateX(0); opacity: 1; transition: transform .2s, opacity .2s; }
+    .panel-enter-active { transform: translateX(0); transition: transform .2s; }
   </style>
 </head>
 <body class="min-h-screen">
 
-  <!-- Welcome Screen -->
-  <div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40">
-    <h1 class="text-5xl font-bold text-indigo-700 select-none mb-4">Welcome to SchoolBoard!</h1>
-    <p class="text-gray-600 text-lg animate-pulse">Click anywhere to enter</p>
-  </div>
+<!-- Welcome -->
+<div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40">
+  <h1 class="text-5xl font-bold text-indigo-700 select-none mb-4">Welcome to SchoolBoard!</h1>
+  <p class="text-gray-600 text-lg animate-pulse">Click anywhere to enter</p>
+</div>
 
-  <!-- Main App -->
-  <div id="app" class="hidden fade opacity-0">
+<!-- Main App -->
+<div id="app" class="hidden fade opacity-0">
 
-    <header class="bg-white shadow-md">
-      <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <i data-lucide="message-square" class="text-indigo-600 w-8 h-8"></i>
-          <div>
-            <h1 class="text-2xl font-bold text-gray-800">SchoolBoard</h1>
-            <p class="text-gray-500 text-sm">Forum — your school community hub</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button id="draftsBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2">
-            <i data-lucide="archive" class="w-4 h-4"></i> Drafts
-          </button>
-          <div id="userTag" class="text-sm text-gray-600"></div>
+  <header class="bg-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i data-lucide="message-square" class="text-indigo-600 w-8 h-8"></i>
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">SchoolBoard</h1>
+          <p class="text-gray-500 text-sm">Forum — your school community hub</p>
         </div>
       </div>
-    </header>
-
-    <!-- Tabs (only Forum) -->
-    <div class="bg-white border-b sticky top-0 z-10">
-      <div class="max-w-6xl mx-auto px-4 flex gap-2 overflow-x-auto py-2">
-        <button class="flex items-center gap-2 px-4 py-2 border-b-2 border-indigo-600 text-indigo-600 font-medium">
-          <i data-lucide="message-square" class="w-5 h-5"></i> Forum
+      <div class="flex items-center gap-3">
+        <button id="draftsBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2">
+          <i data-lucide="archive" class="w-4 h-4"></i> Drafts
         </button>
+        <div id="userTag" class="text-sm text-gray-600"></div>
       </div>
     </div>
+  </header>
 
-    <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
-
-      <!-- Search -->
-      <div class="relative">
-        <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
-        <input id="search" type="text" placeholder="Search..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-      </div>
-
-      <!-- Post editor -->
-      <div class="bg-white rounded-lg shadow-lg p-6">
-        <h2 class="text-xl font-bold mb-4 text-gray-800">Create a Forum Post</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-          <input id="author" placeholder="Your name (displayed)" class="col-span-1 md:col-span-1 px-4 py-2 border rounded-lg" />
-          <input id="title" placeholder="Title" class="col-span-1 md:col-span-2 px-4 py-2 border rounded-lg" />
-        </div>
-
-        <textarea id="contentText" placeholder="Write your message..." rows="4" class="w-full px-4 py-3 border rounded-lg mb-3 resize-none"></textarea>
-
-        <div class="flex items-center gap-3">
-          <button id="postBtn" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Post</button>
-          <button id="saveDraftBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">Save Draft</button>
-          <span id="editorStatus" class="text-sm text-gray-500 ml-3"></span>
-        </div>
-      </div>
-
-      <!-- Posts container (Forum) -->
-      <div id="content" class="space-y-6"></div>
+  <!-- Forum Tab -->
+  <div class="bg-white border-b sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 flex gap-2 overflow-x-auto py-2">
+      <button class="flex items-center gap-2 px-4 py-2 border-b-2 border-indigo-600 text-indigo-600 font-medium">
+        <i data-lucide="message-square" class="w-5 h-5"></i> Forum
+      </button>
     </div>
   </div>
 
-  <!-- Drafts panel (hidden by default) -->
-  <div id="draftsPanel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-white shadow-lg z-50 transform translate-x-full">
-    <div class="p-4 border-b flex items-center justify-between">
-      <h3 class="text-lg font-semibold">Your Drafts</h3>
-      <div class="flex items-center gap-2">
-        <button id="newDraftBtn" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">New</button>
-        <button id="closeDrafts" class="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"><i data-lucide="x" class="w-4 h-4"></i></button>
+  <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Search -->
+    <div class="relative">
+      <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
+      <input id="search" type="text" placeholder="Search..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+    </div>
+
+    <!-- Post editor -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+      <h2 class="text-xl font-bold mb-4 text-gray-800">Create a Forum Post</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <input id="author" placeholder="Your name (displayed)" class="col-span-1 md:col-span-1 px-4 py-2 border rounded-lg" />
+        <input id="title" placeholder="Title" class="col-span-1 md:col-span-2 px-4 py-2 border rounded-lg" />
+      </div>
+      <textarea id="contentText" placeholder="Write your message..." rows="4" class="w-full px-4 py-3 border rounded-lg mb-3 resize-none"></textarea>
+      <div class="flex items-center gap-3">
+        <button id="postBtn" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Post</button>
+        <button id="saveDraftBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">Save Draft</button>
+        <span id="editorStatus" class="text-sm text-gray-500 ml-3"></span>
       </div>
     </div>
 
-    <div class="p-4 overflow-auto h-[calc(100vh-72px)]">
-      <div id="draftsList" class="space-y-3"></div>
-      <div id="emptyDrafts" class="text-gray-500 text-center py-8"><i data-lucide="file-text" class="w-10 h-10 mx-auto text-gray-300"></i><p class="mt-3">No drafts yet.</p></div>
+    <!-- Posts -->
+    <div id="content" class="space-y-6"></div>
+  </div>
+</div>
+
+<!-- Drafts panel -->
+<div id="draftsPanel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-white shadow-lg z-50 transform translate-x-full">
+  <div class="p-4 border-b flex items-center justify-between">
+    <h3 class="text-lg font-semibold">Your Drafts</h3>
+    <div class="flex items-center gap-2">
+      <button id="newDraftBtn" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">New</button>
+      <button id="closeDrafts" class="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
   </div>
+  <div class="p-4 overflow-auto h-[calc(100vh-72px)]">
+    <div id="draftsList" class="space-y-3"></div>
+    <div id="emptyDrafts" class="text-gray-500 text-center py-8"><i data-lucide="file-text" class="w-10 h-10 mx-auto text-gray-300"></i><p class="mt-3">No drafts yet.</p></div>
+  </div>
+</div>
 
-  <!-- Firebase SDKs and App logic -->
-  <script type="module">
-    // Firebase imports (v11)
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-    import { getDatabase, ref, push, onValue, set, remove, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-    // ---------- CONFIG ----------
-    const firebaseConfig = {
-      apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
-      authDomain: "schoolboard-942bc.firebaseapp.com",
-      databaseURL: "https://schoolboard-942bc-default-rtdb.firebaseio.com",
-      projectId: "schoolboard-942bc",
-      storageBucket: "schoolboard-942bc.firebasestorage.app",
-      messagingSenderId: "530189085355",
-      appId: "1:530189085355:web:6d2706eb965a7c5bf125ee"
-    };
+// ---------- CONFIG ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
+  authDomain: "schoolboard-942bc.firebaseapp.com",
+  databaseURL: "https://schoolboard-942bc-default-rtdb.firebaseio.com",
+  projectId: "schoolboard-942bc",
+  storageBucket: "schoolboard-942bc.firebasestorage.app",
+  messagingSenderId: "530189085355",
+  appId: "1:530189085355:web:6d2706eb965a7c5bf125ee"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
-    // initialize
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const auth = getAuth(app);
+// ---------- DOM ----------
+const welcome = document.getElementById('welcome-screen');
+const appRoot = document.getElementById('app');
+const draftsBtn = document.getElementById('draftsBtn');
+const draftsPanel = document.getElementById('draftsPanel');
+const closeDrafts = document.getElementById('closeDrafts');
+const draftsList = document.getElementById('draftsList');
+const emptyDrafts = document.getElementById('emptyDrafts');
+const draftsBtnNew = document.getElementById('newDraftBtn');
 
-    // DOM
-    const welcome = document.getElementById('welcome-screen');
-    const appRoot = document.getElementById('app');
-    const draftsBtn = document.getElementById('draftsBtn');
-    const draftsPanel = document.getElementById('draftsPanel');
-    const closeDrafts = document.getElementById('closeDrafts');
-    const draftsList = document.getElementById('draftsList');
-    const emptyDrafts = document.getElementById('emptyDrafts');
-    const draftsPanelWidth = 384; // md:w-96 approx 384px
-    const draftsBtnNew = document.getElementById('newDraftBtn');
+const postBtn = document.getElementById('postBtn');
+const saveDraftBtn = document.getElementById('saveDraftBtn');
+const authorInput = document.getElementById('author');
+const titleInput = document.getElementById('title');
+const contentInput = document.getElementById('contentText');
+const contentContainer = document.getElementById('content');
+const searchInput = document.getElementById('search');
+const editorStatus = document.getElementById('editorStatus');
+const userTag = document.getElementById('userTag');
 
-    const postBtn = document.getElementById('postBtn');
-    const saveDraftBtn = document.getElementById('saveDraftBtn');
-    const authorInput = document.getElementById('author');
-    const titleInput = document.getElementById('title');
-    const contentInput = document.getElementById('contentText');
-    const contentContainer = document.getElementById('content');
-    const searchInput = document.getElementById('search');
-    const editorStatus = document.getElementById('editorStatus');
-    const userTag = document.getElementById('userTag');
+let currentUser = null;
+let currentEditingDraftId = null;
+let draftsCache = {};
+let postsCache = {};
 
-    // state
-    let currentUser = null;
-    let currentEditingDraftId = null; // when editing a draft from panel, load here
-    let draftsCache = {}; // local copy of user's drafts
-    let postsCache = {};  // latest posts loaded
+// ---------- utility ----------
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now()-ts)/1000);
+  if(diff<60) return "Just now";
+  if(diff<3600) return `${Math.floor(diff/60)} minutes ago`;
+  if(diff<86400) return `${Math.floor(diff/3600)} hours ago`;
+  return `${Math.floor(diff/86400)} days ago`;
+}
+function escapeHtml(str){if(!str)return"";return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 
-    // utility timeAgo (digit-by-digit style not needed but careful)
-    function timeAgo(ts) {
-      const diff = Math.floor((Date.now() - ts) / 1000);
-      if (diff < 60) return "Just now";
-      if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-      if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-      return `${Math.floor(diff / 86400)} days ago`;
-    }
+// ---------- Auth with local UID ----------
+let storedUid = localStorage.getItem('anonUid');
+if(!storedUid){
+  signInAnonymously(auth).then(user=>{
+    storedUid=user.user.uid;
+    localStorage.setItem('anonUid', storedUid);
+    currentUser = user.user;
+    userTag.innerText=`User: ${storedUid.slice(0,8)}`;
+    initRealtime();
+  }).catch(err=>console.error(err));
+}else{
+  // use same uid
+  currentUser={uid:storedUid};
+  userTag.innerText=`User: ${storedUid.slice(0,8)}`;
+  initRealtime();
+}
 
-    // ---------- AUTH ----------
-    signInAnonymously(auth)
-      .then(() => console.log("✅ Signed in anonymously"))
-      .catch((err) => console.error("❌ Anonymous sign-in failed:", err));
+// ---------- Welcome flow ----------
+window.addEventListener('load',()=>{
+  lucide.createIcons();
+  welcome.addEventListener('click',()=>{
+    welcome.style.opacity=0;
+    setTimeout(()=>{welcome.remove();appRoot.classList.remove('hidden');appRoot.style.opacity=1;lucide.createIcons();},450);
+  });
+});
 
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        currentUser = user;
-        userTag.innerText = `User: ${user.uid.slice(0,8)}`;
-        initRealtime();
-      } else {
-        currentUser = null;
-      }
-    });
+// ---------- Drafts panel ----------
+draftsBtn.addEventListener('click',()=>{draftsPanel.style.transform='translateX(0)';loadUserDrafts();});
+closeDrafts.addEventListener('click',()=>{draftsPanel.style.transform='translateX(100%)';});
+draftsBtnNew.addEventListener('click',()=>{currentEditingDraftId=null;authorInput.value='';titleInput.value='';contentInput.value='';editorStatus.innerText="New draft - unsaved";});
 
-    // ---------- UI: welcome flow ----------
-    window.addEventListener('load', () => {
-      lucide.createIcons();
-      welcome.addEventListener('click', () => {
-        welcome.style.opacity = 0;
-        setTimeout(() => {
-          welcome.remove();
-          appRoot.classList.remove('hidden');
-          appRoot.style.opacity = 1;
-          lucide.createIcons();
-        }, 450);
-      });
-    });
+// ---------- Paths ----------
+const postsPath="posts/forum";
+function draftsBasePathForUid(uid){return `drafts/${uid}`;}
 
-    // ---------- Drafts panel open/close (UI B: right-side panel) ----------
-    draftsBtn.addEventListener('click', () => openDraftsPanel());
-    closeDrafts.addEventListener('click', () => closeDraftsPanel());
-    draftsBtnNew.addEventListener('click', () => {
-      // clear editor to create new draft
-      currentEditingDraftId = null;
-      authorInput.value = "";
-      titleInput.value = "";
-      contentInput.value = "";
-      editorStatus.innerText = "New draft - unsaved";
-    });
+// ---------- Realtime ----------
+function initRealtime(){
+  const postsRef=ref(db,postsPath);
+  onValue(postsRef,snap=>{postsCache=snap.val()||{};renderPosts(Object.entries(postsCache).map(([id,p])=>({id,...p})));});
+  if(currentUser) loadUserDrafts();
+}
 
-    function openDraftsPanel() {
-      draftsPanel.style.transform = 'translateX(0)';
-      draftsPanel.classList.add('panel-enter-active');
-      loadUserDrafts(); // refresh
-    }
+// ---------- Render Forum ----------
+function renderPosts(arr){
+  arr.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  const q=searchInput.value.trim().toLowerCase();
+  const filtered=arr.filter(p=>{
+    if(!q) return true;
+    return (p.title||"").toLowerCase().includes(q)||(p.content||"").toLowerCase().includes(q)||(p.author||"").toLowerCase().includes(q);
+  });
+  contentContainer.innerHTML=filtered.map(p=>renderSinglePostHtml(p)).join("");
+  attachCommentHandlers();
+  lucide.createIcons();
+}
+function renderSinglePostHtml(p){
+  const comments=p.comments?Object.entries(p.comments).map(([cid,c])=>({id:cid,...c})):[];  
+  const commentsHtml=comments.length>0?comments.map(c=>`<div class="mt-2"><div class="flex items-baseline gap-2"><span class="font-medium text-gray-700">${escapeHtml(c.author)}</span><span class="text-sm text-gray-400 ml-1">${timeAgo(c.timestamp||0)}</span></div><div class="text-gray-600">${escapeHtml(c.content)}</div></div>`).join(""):`<p class="text-gray-400 text-sm">No comments yet.</p>`;
+  return `<div class="bg-white p-4 rounded-lg shadow mb-6"><div class="flex justify-between mb-1"><span class="font-semibold text-gray-800">${escapeHtml(p.author||"Anonymous")}</span><span class="text-sm text-gray-500">${timeAgo(p.timestamp||0)}</span></div><h3 class="font-bold text-lg text-gray-900">${escapeHtml(p.title||"(no title)")}</h3><p class="text-gray-700 mt-1 mb-3">${escapeHtml(p.content||"")}</p><div class="pl-4 border-l-4 border-indigo-100">${commentsHtml}<div class="mt-3 flex gap-2"><input id="comment-author-${p.id}" placeholder="Your name" class="flex-1 px-2 py-1 border rounded"><input id="comment-content-${p.id}" placeholder="Add a comment..." class="flex-1 px-2 py-1 border rounded"><button data-post="${p.id}" class="comment-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Comment</button></div></div></div>`;
+}
+function attachCommentHandlers(){
+  document.querySelectorAll('.comment-btn').forEach(btn=>{btn.removeEventListener('click',commentBtnHandler);btn.addEventListener('click',commentBtnHandler);});
+}
+function commentBtnHandler(e){
+  const postId=e.currentTarget.dataset.post;
+  const authorEl=document.getElementById(`comment-author-${postId}`);
+  const contentEl=document.getElementById(`comment-content-${postId}`);
+  const author=(authorEl.value||"").trim();
+  const content=(contentEl.value||"").trim();
+  if(!author||!content) return alert("Please enter your name and comment.");
+  push(ref(db,`${postsPath}/${postId}/comments`),{author,content,timestamp:Date.now()}).then(()=>{authorEl.value="";contentEl.value="";}).catch(err=>alert("Failed to post comment."));
+}
 
-    function closeDraftsPanel() {
-      draftsPanel.style.transform = 'translateX(100%)';
-      draftsPanel.classList.remove('panel-enter-active');
-    }
+// ---------- Post / Save Draft ----------
+postBtn.addEventListener('click',()=>{
+  const author=(authorInput.value||"").trim()||"Anonymous";
+  const title=(titleInput.value||"").trim();
+  const content=(contentInput.value||"").trim();
+  if(!title||!content) return alert("Please fill in a title and the content.");
+  push(ref(db,postsPath),{author,title,content,timestamp:Date.now()}).then(()=>{
+    if(currentEditingDraftId) remove(ref(db,`${draftsBasePathForUid(currentUser.uid)}/${currentEditingDraftId}`)).catch(()=>{});
+    currentEditingDraftId=null;authorInput.value="";titleInput.value="";contentInput.value="";editorStatus.innerText="Posted";
+  }).catch(()=>alert("Failed to post."));
+});
+saveDraftBtn.addEventListener('click',()=>{
+  if(!currentUser) return alert("User not signed in yet.");
+  const author=(authorInput.value||"").trim();
+  const title=(titleInput.value||"").trim();
+  const content=(contentInput.value||"").trim();
+  if(!author&&!title&&!content) return alert("Draft is empty.");
+  const base=draftsBasePathForUid(currentUser.uid);
+  if(currentEditingDraftId){
+    update(ref(db,`${base}/${currentEditingDraftId}`),{author,title,content,timestamp:Date.now()}).then(()=>{editorStatus.innerText="Draft updated";}).catch(()=>alert("Failed to update draft."));
+  }else{
+    push(ref(db,base),{author,title,content,timestamp:Date.now()}).then(()=>{editorStatus.innerText="Draft saved";}).catch(()=>alert("Failed to save draft."));
+  }
+});
 
-    // ---------- Database paths ----------
-    // Published forum posts:
-    const postsPath = "posts/forum";
-    // Drafts per-user:
-    // drafts/{uid}/{draftId}
-    function draftsBasePathForUid(uid) { return `drafts/${uid}`; }
+// ---------- Load / Render Drafts ----------
+function loadUserDrafts(){
+  if(!currentUser) return;
+  onValue(ref(db,draftsBasePathForUid(currentUser.uid)),snap=>{draftsCache=snap.val()||{};renderDraftsList();});
+}
+function renderDraftsList(){
+  const entries=Object.entries(draftsCache||{});
+  if(entries.length===0){draftsList.innerHTML="";emptyDrafts.style.display="block";return;}
+  emptyDrafts.style.display="none";
+  draftsList.innerHTML=entries.sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0)).map(([id,d])=>`<div class="border rounded p-3"><div class="flex justify-between items-start gap-2"><div><div class="font-medium text-gray-800">${escapeHtml(d.title||"(no title)")}</div><div class="text-gray-500 text-sm">${escapeHtml(d.author||"Anonymous")} · ${timeAgo(d.timestamp||0)}</div></div><div class="flex gap-2"><button data-id="${id}" class="edit-draft px-2 py-1 bg-yellow-100 rounded hover:bg-yellow-200 text-sm">Edit</button><button data-id="${id}" class="publish-draft px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">Publish</button><button data-id="${id}" class="delete-draft px-2 py-1 bg-red-100 rounded hover:bg-red-200 text-sm">Delete</button></div></div><div class="text-gray-700 mt-2">${escapeHtml((d.content||"").slice(0,200))}${(d.content||"").length>200?"...":""}</div></div>`).join("");
+  draftsList.querySelectorAll('.edit-draft').forEach(btn=>{btn.addEventListener('click',e=>{const id=e.currentTarget.dataset.id;openDraftForEdit(id);});});
+  draftsList.querySelectorAll('.publish-draft').forEach(btn=>{btn.addEventListener('click',e=>{const id=e.currentTarget.dataset.id;publishDraft(id);});});
+  draftsList.querySelectorAll('.delete-draft').forEach(btn=>{btn.addEventListener('click',e=>{const id=e.currentTarget.dataset.id;if(confirm("Delete draft?")) remove(ref(db,`${draftsBasePathForUid(currentUser.uid)}/${id}`));});});
+  lucide.createIcons();
+}
 
-    // ---------- Real-time listeners ----------
-    function initRealtime() {
-      // listen to forum posts
-      const postsRef = ref(db, postsPath);
-      onValue(postsRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        postsCache = data;
-        renderPosts(Object.entries(data).map(([id, p]) => ({ id, ...p })));
-      });
+function openDraftForEdit(id){
+  const d=draftsCache[id];
+  if(!d) return;
+  currentEditingDraftId=id;
+  authorInput.value=d.author||"";
+  titleInput.value=d.title||"";
+  contentInput.value=d.content||"";
+  editorStatus.innerText="Editing draft";
+}
+function publishDraft(id){
+  const d=draftsCache[id];
+  if(!d) return;
+  push(ref(db,postsPath),{author:d.author,title:d.title,content:d.content,timestamp:Date.now()}).then(()=>{
+    remove(ref(db,`${draftsBasePathForUid(currentUser.uid)}/${id}`)).catch(()=>{});
+    currentEditingDraftId=null;authorInput.value="";titleInput.value="";contentInput.value="";editorStatus.innerText="Posted";
+  }).catch(()=>alert("Failed to publish draft."));
+}
 
-      // listen to user's drafts
-      if (!currentUser) return;
-      const myDraftsRef = ref(db, draftsBasePathForUid(currentUser.uid));
-      onValue(myDraftsRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        draftsCache = data;
-        // if panel open, refresh list
-        if (draftsPanel.style.transform === 'translateX(0px)' || draftsPanel.style.transform === 'translateX(0)') {
-          renderDraftsList();
-        }
-      });
-    }
+// ---------- Search ----------
+searchInput.addEventListener('input',()=>{renderPosts(Object.entries(postsCache||{}).map(([id,p])=>({id,...p})));});
 
-    // ---------- Render forum posts ----------
-    function renderPosts(postsArray) {
-      // convert to sorted (newest first)
-      postsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+</script>
 
-      const q = searchInput.value.trim().toLowerCase();
-      const filtered = postsArray.filter(p => {
-        if (!q) return true;
-        return (
-          (p.title || "").toLowerCase().includes(q) ||
-          (p.content || "").toLowerCase().includes(q) ||
-          (p.author || "").toLowerCase().includes(q)
-        );
-      });
-
-      contentContainer.innerHTML = filtered.map(p => renderSinglePostHtml(p)).join("");
-      // attach event listeners for comment buttons (delegated)
-      attachCommentHandlers();
-      lucide.createIcons();
-    }
-
-    function renderSinglePostHtml(p) {
-      const comments = p.comments ? Object.entries(p.comments).map(([cid, c]) => ({ id: cid, ...c })) : [];
-      const commentsHtml = comments.length > 0 ? comments.map(c => `
-          <div class="mt-2">
-            <div class="flex items-baseline gap-2">
-              <span class="font-medium text-gray-700">${escapeHtml(c.author)}</span>
-              <span class="text-sm text-gray-400 ml-1">${timeAgo(c.timestamp || 0)}</span>
-            </div>
-            <div class="text-gray-600">${escapeHtml(c.content)}</div>
-          </div>
-        `).join("") : `<p class="text-gray-400 text-sm">No comments yet.</p>`;
-
-      return `
-        <div class="bg-white p-4 rounded-lg shadow mb-6">
-          <div class="flex justify-between mb-1">
-            <span class="font-semibold text-gray-800">${escapeHtml(p.author || "Anonymous")}</span>
-            <span class="text-sm text-gray-500">${timeAgo(p.timestamp || 0)}</span>
-          </div>
-          <h3 class="font-bold text-lg text-gray-900">${escapeHtml(p.title || "(no title)")}</h3>
-          <p class="text-gray-700 mt-1 mb-3">${escapeHtml(p.content || "")}</p>
-
-          <!-- comments -->
-          <div class="pl-4 border-l-4 border-indigo-100">
-            ${commentsHtml}
-
-            <div class="mt-3 flex gap-2">
-              <input id="comment-author-${p.id}" placeholder="Your name" class="flex-1 px-2 py-1 border rounded" />
-              <input id="comment-content-${p.id}" placeholder="Add a comment..." class="flex-1 px-2 py-1 border rounded" />
-              <button data-post="${p.id}" class="comment-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Comment</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    // ---------- Comment handlers (delegated) ----------
-    function attachCommentHandlers() {
-      // Remove previous to avoid duplicates
-      document.querySelectorAll('.comment-btn').forEach(btn => {
-        btn.removeEventListener('click', commentBtnHandler);
-        btn.addEventListener('click', commentBtnHandler);
-      });
-    }
-
-    function commentBtnHandler(e) {
-      const postId = e.currentTarget.dataset.post;
-      const authorEl = document.getElementById(`comment-author-${postId}`);
-      const contentEl = document.getElementById(`comment-content-${postId}`);
-      const author = (authorEl.value || "").trim();
-      const content = (contentEl.value || "").trim();
-      if (!author || !content) return alert("Please enter your name and comment.");
-
-      const commentRef = ref(db, `${postsPath}/${postId}/comments`);
-      push(commentRef, {
-        author,
-        content,
-        timestamp: Date.now()
-      }).then(() => {
-        authorEl.value = "";
-        contentEl.value = "";
-      }).catch(err => {
-        console.error("Failed to post comment:", err);
-        alert("Failed to post comment.");
-      });
-    }
-
-    // ---------- Save Post (publish) ----------
-    postBtn.addEventListener('click', () => {
-      const author = (authorInput.value || "").trim() || "Anonymous";
-      const title = (titleInput.value || "").trim();
-      const content = (contentInput.value || "").trim();
-      if (!title || !content) return alert("Please fill in a title and the content.");
-
-      const postsRef = ref(db, postsPath);
-      push(postsRef, {
-        author,
-        title,
-        content,
-        timestamp: Date.now()
-      }).then(() => {
-        // if the current editor is editing a draft, remove that draft after publish
-        if (currentEditingDraftId && currentUser) {
-          const draftRef = ref(db, `${draftsBasePathForUid(currentUser.uid)}/${currentEditingDraftId}`);
-          remove(draftRef).catch(err => console.warn("Failed to remove draft after publish:", err));
-          currentEditingDraftId = null;
-        }
-        // clear editor
-        authorInput.value = "";
-        titleInput.value = "";
-        contentInput.value = "";
-        editorStatus.innerText = "Posted";
-      }).catch(err => {
-        console.error("Failed to post:", err);
-        alert("Failed to post.");
-      });
-    });
-
-    // ---------- Save Draft ----------
-    saveDraftBtn.addEventListener('click', () => {
-      if (!currentUser) return alert("User not signed in yet.");
-      const author = (authorInput.value || "").trim();
-      const title = (titleInput.value || "").trim();
-      const content = (contentInput.value || "").trim();
-      if (!author && !title && !content) return alert("Draft is empty.");
-
-      const base = draftsBasePathForUid(currentUser.uid);
-      if (currentEditingDraftId) {
-        // update existing draft
-        const draftRef = ref(db, `${base}/${currentEditingDraftId}`);
-        update(draftRef, {
-          author,
-          title,
-          content,
-          timestamp: Date.now()
-        }).then(() => {
-          editorStatus.innerText = "Draft updated";
-        }).catch(err => {
-          console.error("Failed to update draft:", err);
-          alert("Failed to update draft.");
-        });
-      } else {
-        // create new draft
-        const draftsRef = ref(db, base);
-        push(draftsRef, {
-          author,
-          title,
-          content,
-          timestamp: Date.now()
-        }).then(() => {
-          editorStatus.innerText = "Draft saved";
-        }).catch(err => {
-          console.error("Failed to save draft:", err);
-          alert("Failed to save draft.");
-        });
-      }
-    });
-
-    // ---------- Load and render user drafts in panel ----------
-    function loadUserDrafts() {
-      if (!currentUser) return;
-      const myDraftsRef = ref(db, draftsBasePathForUid(currentUser.uid));
-      onValue(myDraftsRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        draftsCache = data;
-        renderDraftsList();
-      });
-    }
-
-    function renderDraftsList() {
-      const entries = Object.entries(draftsCache || {});
-      if (entries.length === 0) {
-        draftsList.innerHTML = "";
-        emptyDrafts.style.display = "block";
-        return;
-      }
-      emptyDrafts.style.display = "none";
-      draftsList.innerHTML = entries
-        .sort((a,b) => (b[1].timestamp || 0) - (a[1].timestamp || 0))
-        .map(([id, d]) => {
-          return `
-            <div class="border rounded p-3">
-              <div class="flex justify-between items-start gap-2">
-                <div>
-                  <div class="font-medium text-gray-800">${escapeHtml(d.title || "(no title)")}</div>
-                  <div class="text-gray-500 text-sm">${escapeHtml(d.author || "Anonymous")} · ${timeAgo(d.timestamp || 0)}</div>
-                </div>
-                <div class="flex gap-2">
-                  <button data-id="${id}" class="edit-draft px-2 py-1 bg-yellow-100 rounded hover:bg-yellow-200 text-sm">Edit</button>
-                  <button data-id="${id}" class="publish-draft px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">Publish</button>
-                  <button data-id="${id}" class="delete-draft px-2 py-1 bg-red-100 rounded hover:bg-red-200 text-sm">Delete</button>
-                </div>
-              </div>
-              <div class="text-gray-700 mt-2">${escapeHtml((d.content || "").slice(0,200))}${(d.content||"").length>200?"...":""}</div>
-            </div>
-          `;
-        }).join("");
-
-      // attach events
-      draftsList.querySelectorAll('.edit-draft').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.currentTarget.dataset.id;
-          openDraftForEdit(id);
-        });
-      });
-      draftsList.querySelectorAll('.publish-draft').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.currentTarget.dataset.id;
-          publishDraft(id);
-        });
-      });
-      draftsList.querySelectorAll('.delete-draft').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.currentTarget.dataset.id;
-          if (!confirm('Delete this draft?')) return;
-          deleteDraft(id);
-        });
-      });
-      lucide.createIcons();
-    }
-
-    function openDraftForEdit(draftId) {
-      const d = draftsCache[draftId];
-      if (!d) return alert("Draft not found.");
-      currentEditingDraftId = draftId;
-      authorInput.value = d.author || "";
-      titleInput.value = d.title || "";
-      contentInput.value = d.content || "";
-      editorStatus.innerText = "Editing draft";
-      // open panel stays open; but bring user attention to editor by closing panel
-      closeDraftsPanel();
-      // scroll to top
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function deleteDraft(draftId) {
-      if (!currentUser) return;
-      const draftRef = ref(db, `${draftsBasePathForUid(currentUser.uid)}/${draftId}`);
-      remove(draftRef).catch(err => {
-        console.error("Failed to delete draft:", err);
-        alert("Failed to delete draft.");
-      });
-    }
-
-    function publishDraft(draftId) {
-      if (!currentUser) return;
-      const d = draftsCache[draftId];
-      if (!d) return alert("Draft not found.");
-      // copy to posts/forum
-      const postsRef = ref(db, postsPath);
-      push(postsRef, {
-        author: d.author || "Anonymous",
-        title: d.title || "(no title)",
-        content: d.content || "",
-        timestamp: Date.now()
-      }).then(() => {
-        // remove original draft
-        const draftRef = ref(db, `${draftsBasePathForUid(currentUser.uid)}/${draftId}`);
-        remove(draftRef).catch(err => console.warn("Failed to remove draft after publish:", err));
-        editorStatus.innerText = "Draft published";
-      }).catch(err => {
-        console.error("Failed to publish draft:", err);
-        alert("Failed to publish draft.");
-      });
-    }
-
-    // ---------- Helpers ----------
-    // Simple HTML escape
-    function escapeHtml(str) {
-      if (!str) return "";
-      return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
-        .replaceAll("\n", '<br/>');
-    }
-
-    // ---------- Search ----------
-    searchInput.addEventListener('input', () => {
-      // Rerender posts from cached posts
-      const postsArray = Object.entries(postsCache || {}).map(([id, p]) => ({ id, ...p }));
-      renderPosts(postsArray);
-    });
-
-    // ---------- Accessibility: click outside to close drafts panel (mobile) ----------
-    window.addEventListener('click', (e) => {
-      const path = e.composedPath ? e.composedPath() : (e.path || []);
-      const isDraftsBtn = path.includes(draftsBtn);
-      const isDraftsPanel = path.includes(draftsPanel);
-      if (!isDraftsBtn && !isDraftsPanel && draftsPanel.style.transform === 'translateX(0)') {
-        // click outside -> close
-        closeDraftsPanel();
-      }
-    });
-
-    // ---------- End module ----------
-  </script>
 </body>
 </html>
