@@ -19,26 +19,10 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 </head>
 <body class="min-h-screen">
 
-<!-- Welcome/Login Screen -->
-<div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40 p-4">
-  <h1 class="text-4xl font-bold text-indigo-700 select-none mb-4 text-center">Welcome to SchoolBoard Forum!</h1>
-
-  <div id="loginPanel" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-    <p class="mb-1 font-medium text-gray-700">Display Name (可重复)</p>
-    <input type="text" id="displayNameInput" placeholder="Your display name" class="px-3 py-2 border rounded w-full mb-2">
-
-    <p class="mb-2 font-medium text-gray-700">Email Login</p>
-    <input type="email" id="emailInput" placeholder="Email" class="px-3 py-2 border rounded w-full mb-2">
-    <input type="password" id="passwordInput" placeholder="Password" class="px-3 py-2 border rounded w-full mb-2">
-    <button id="emailLoginBtn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 w-full mb-2">Login/Register</button>
-
-    <p class="mb-2 mt-2 font-medium text-gray-700">Phone Login</p>
-    <input type="text" id="phoneInput" placeholder="+8613800000000" class="px-3 py-2 border rounded w-full mb-2">
-    <button id="phoneLoginBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full mb-2">Login via SMS</button>
-
-    <p class="text-center text-gray-500 mt-2">or</p>
-    <button id="anonLoginBtn" class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 w-full mt-2">Anonymous Login</button>
-  </div>
+<!-- Welcome Screen -->
+<div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40">
+  <h1 class="text-5xl font-bold text-indigo-700 select-none mb-4">Welcome to SchoolBoard Forum!</h1>
+  <p class="text-gray-600 text-lg animate-pulse">Click anywhere to enter</p>
 </div>
 
 <!-- Forum Page -->
@@ -77,9 +61,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
     </button>
     <div class="flex items-center gap-2">
       <span id="topicPageName" class="text-xl font-bold"></span>
-      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 hidden text-sm">
-        <i data-lucide="trash-2" class="w-4 h-4"></i> Delete Topic
-      </button>
+      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 hidden text-sm">Delete Topic</button>
     </div>
   </div>
 
@@ -101,7 +83,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
 import { getDatabase, ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
 // Firebase 配置
 const firebaseConfig = {
@@ -113,17 +95,18 @@ const firebaseConfig = {
   messagingSenderId: "530189085355",
   appId: "1:530189085355:web:6d2706eb965a7c5bf125ee"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
 let currentUser=null;
-let currentUserName=null;
-let currentUserId=null;
+let currentUserName = localStorage.getItem('anonName') || prompt("Enter your display name:", "Anonymous") || "Anonymous";
+localStorage.setItem('anonName', currentUserName);
+
 let topicsCache={};
 let currentTopicId=null;
 
-// DOM 元素
 const welcome=document.getElementById('welcome-screen');
 const forumPage=document.getElementById('forumPage');
 const topicPage=document.getElementById('topicPage');
@@ -142,70 +125,37 @@ const newPostContent=document.getElementById('newPostContent');
 const postBtn=document.getElementById('postBtn');
 const editorStatus=document.getElementById('editorStatus');
 const userTag=document.getElementById('userTag');
-
-// 登录面板元素
-const displayNameInput = document.getElementById('displayNameInput');
-const emailInput = document.getElementById('emailInput');
-const passwordInput = document.getElementById('passwordInput');
-const phoneInput = document.getElementById('phoneInput');
-const emailLoginBtn = document.getElementById('emailLoginBtn');
-const phoneLoginBtn = document.getElementById('phoneLoginBtn');
-const anonLoginBtn = document.getElementById('anonLoginBtn');
+userTag.innerText=`User: ${currentUserName}`;
 
 // 工具函数
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
-function generateRandomId(length=8){return Math.random().toString(36).substring(2,2+length);}
 
-// 登录成功
-function loginSuccess(user,displayName){
-  currentUser=user;
-  currentUserId = user.uid || generateRandomId();
-  currentUserName=displayName;
-  userTag.innerText=`${displayName} (${currentUserId})`;
-  welcome.remove();
-  forumPage.classList.remove('hidden');
-  forumPage.style.opacity=1;
+// 匿名登录
+let storedUid = localStorage.getItem('anonUid');
+if(!storedUid){
+  signInAnonymously(auth).then(u=>{
+    storedUid=u.user.uid;
+    localStorage.setItem('anonUid',storedUid);
+    currentUser=u.user;
+    initRealtime();
+  }).catch(console.error);
+}else{
+  currentUser={uid:storedUid};
   initRealtime();
 }
 
-// 登录逻辑
-anonLoginBtn.addEventListener('click', ()=>{
-  let name = displayNameInput.value.trim() || 'Anonymous';
-  signInAnonymously(auth).then(u=>loginSuccess(u.user,name)).catch(console.error);
+// 欢迎页点击
+welcome.addEventListener('click',()=>{
+  welcome.style.opacity=0;
+  setTimeout(()=>{
+    welcome.remove();
+    forumPage.classList.remove('hidden');
+    forumPage.style.opacity=1;
+  },400);
 });
 
-emailLoginBtn.addEventListener('click', ()=>{
-  let name = displayNameInput.value.trim() || 'Anonymous';
-  const email = emailInput.value.trim();
-  const pw = passwordInput.value;
-  if(!email || !pw) return alert("Email/Password required");
-  signInWithEmailAndPassword(auth,email,pw)
-    .then(u=>loginSuccess(u.user,name))
-    .catch(err=>{
-      if(err.code==='auth/user-not-found'){
-        createUserWithEmailAndPassword(auth,email,pw)
-          .then(u=>loginSuccess(u.user,name))
-          .catch(console.error);
-      } else alert(err.message);
-    });
-});
-
-window.recaptchaVerifier = new RecaptchaVerifier('loginPanel', { 'size': 'invisible' }, auth);
-phoneLoginBtn.addEventListener('click', ()=>{
-  let name = displayNameInput.value.trim() || 'Anonymous';
-  const phone = phoneInput.value.trim();
-  if(!phone) return alert("Enter phone number");
-  signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
-    .then(confirmationResult=>{
-      const code = prompt("Enter verification code:");
-      return confirmationResult.confirm(code);
-    })
-    .then(u=>loginSuccess(u.user,name))
-    .catch(console.error);
-});
-
-// ---------- 实时数据库 ----------
+// 初始化实时监听
 function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
     topicsCache=snap.val()||{};
@@ -213,18 +163,31 @@ function initRealtime(){
     renderDrafts();
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
+  onValue(ref(db,`drafts/${currentUser.uid}`),snap=>{
+    renderDrafts(snap.val()||{});
+  });
 }
 
-// ---------- 工具与论坛功能 ----------
+// ---------- 论坛页面 ----------
 function renderForum(){
   const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
-  arr.sort((a,b)=>b.timestamp-a.timestamp);
+  arr.sort((a,b)=>{
+    const aFav=a.favorites&&a.favorites[currentUser.uid]?1:0;
+    const bFav=b.favorites&&b.favorites[currentUser.uid]?1:0;
+    if(aFav!==bFav) return bFav-aFav;
+    return (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0);
+  });
   forumContainer.innerHTML=arr.map(t=>{
+    const topPosts=t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
+    const preview=topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
+    const fav=t.favorites&&t.favorites[currentUser.uid]?true:false;
     return `<div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
       <div>
         <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
         <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
+        ${preview}
       </div>
+      <button onclick="toggleFavorite(event,'${t.id}')" class="px-2 py-1 rounded ${fav?'bg-yellow-400':'bg-gray-200'} hover:bg-yellow-300">★</button>
     </div>`;
   }).join('');
 }
@@ -244,18 +207,18 @@ function renderDrafts(draftsObj){
   }
 }
 
-// 创建/保存草稿
+// 草稿操作
 createTopicBtn.addEventListener('click',()=>{createTopic(topicNameInput.value,topicDescInput.value);});
 saveDraftBtn.addEventListener('click',()=>{
   const valName=topicNameInput.value.trim();
   if(!valName) return alert("Enter topic name for draft");
   const valDesc=topicDescInput.value.trim();
-  const draftRef=push(ref(db,`drafts/${currentUserId}`));
+  const draftRef=push(ref(db,`drafts/${currentUser.uid}`));
   set(draftRef,{topicName:valName,description:valDesc,timestamp:Date.now()});
   topicNameInput.value=''; topicDescInput.value='';
 });
 window.publishDraft=function(draftId){
-  const draftRef=ref(db,`drafts/${currentUserId}/${draftId}`);
+  const draftRef=ref(db,`drafts/${currentUser.uid}/${draftId}`);
   onValue(draftRef,snap=>{
     if(!snap.exists()) return;
     const data=snap.val();
@@ -263,88 +226,109 @@ window.publishDraft=function(draftId){
     remove(draftRef);
   },{onlyOnce:true});
 }
-window.deleteDraft=function(draftId){if(!confirm("Delete this draft?")) return; remove(ref(db,`drafts/${currentUserId}/${draftId}`));}
+window.deleteDraft=function(draftId){if(!confirm("Delete this draft?")) return; remove(ref(db,`drafts/${currentUser.uid}/${draftId}`));}
+
+// 收藏
+window.toggleFavorite=function(e,topicId){e.stopPropagation(); const favRef=ref(db,`topics/${topicId}/favorites/${currentUser.uid}`); onValue(favRef,snap=>{snap.exists()?remove(favRef):set(favRef,true);},{onlyOnce:true});}
 
 // 创建话题
-function createTopic(name,desc){push(ref(db,'topics'),{topicName:name,description:desc,authorUid:currentUserId,authorName:currentUserName,timestamp:Date.now()}); topicNameInput.value=''; topicDescInput.value='';}
+function createTopic(name,desc){push(ref(db,'topics'),{topicName:name,description:desc,authorUid:currentUser.uid,authorName:currentUserName,timestamp:Date.now()}); topicNameInput.value=''; topicDescInput.value='';}
 
-// 打开话题页
+// 打开话题
 window.openTopic=function(topicId){currentTopicId=topicId; forumPage.classList.add('hidden'); topicPage.classList.remove('hidden'); topicPage.style.opacity=1; renderTopicPage(topicId);}
 backToForumBtn.addEventListener('click',()=>{topicPage.classList.add('hidden'); forumPage.classList.remove('hidden'); forumPage.style.opacity=1; currentTopicId=null; newPostContent.value=''; editorStatus.innerText='';});
 
 // 渲染话题页
 function renderTopicPage(topicId){
-  const topic = topicsCache[topicId]; if(!topic) return;
-  topicPageName.innerText = topic.topicName; topicPageDesc.innerText = topic.description||'';
-  deleteTopicBtn.style.display = (topic.authorUid===currentUserId)?'inline-flex':'none';
-  const posts = topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp):[];
+  const topic=topicsCache[topicId]; if(!topic) return;
+  topicPageName.innerText=topic.topicName; topicPageDesc.innerText=topic.description||'';
+  deleteTopicBtn.style.display=(topic.authorUid===currentUser.uid)?'inline-block':'none';
+  const posts = topic.posts ? Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp) : [];
   postsContainer.innerHTML='';
-  posts.forEach(p=>{renderPostRecursive(p,postsContainer,topicId)});
+  posts.forEach(p=>renderPostRecursive(p,postsContainer,topicId));
 }
 
-// 多级帖子递归渲染
-function renderPostRecursive(post,parentElem,topicId){
-  const canDelete=post.authorUid===currentUserId || topicsCache[topicId].authorUid===currentUserId;
-  const userLiked=post.likes && post.likes[currentUserId]?true:false;
-  const likesCount=post.likes?Object.keys(post.likes).length:0;
+// 递归渲染帖子与回复（图标排一行）
+function renderPostRecursive(post, parentElem, topicId, parentPath='posts'){
+  const postPath = `${parentPath}/${post.id}`;
+  const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid;
+  const userLiked = post.likes && post.likes[currentUser.uid];
+  const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
-  const div=document.createElement('div');
-  div.className='bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
-  div.innerHTML=`
-    <div class="flex justify-between items-start" id="postHeader-${post.id}">
+  const div = document.createElement('div');
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 reply';
+  div.innerHTML = `
+    <div class="flex justify-between items-start flex-wrap md:flex-nowrap">
       <div>
         <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
         <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
       </div>
-      <div class="flex gap-2 post-actions">
-        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
-        <span class="text-sm">${likesCount}</span>
-        ${canDelete?`<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>`:''}
+      <div class="flex gap-3 mt-2 md:mt-0 post-actions">
+        <i onclick="likePost('${postPath}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5 cursor-pointer"></i>
+        <span class="text-sm mt-1">${likesCount}</span>
+        ${canDelete?`<i onclick="deletePost('${postPath}')" data-lucide="trash-2" class="text-red-500 w-5 h-5 cursor-pointer"></i>`:''}
       </div>
     </div>
     <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
     <span class="collapse-toggle hidden" id="toggle-${post.id}">Show Replies</span>
     <div id="replies-${post.id}" class="mt-2 hidden"></div>
     <div id="replyBox-${post.id}" class="mt-2 hidden">
-      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full mb-1" id="replyInput-${post.id}">
-      <button class="bg-indigo-600 text-white px-3 py-1 rounded text-sm" onclick="replyPost('${post.id}')">Reply</button>
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
+             onkeypress="if(event.key==='Enter'){submitReply('${postPath}', this.value); this.value=''; this.parentElement.classList.add('hidden');}">
+      <p class="text-xs text-gray-400 mt-1">Press Enter to submit</p>
     </div>
   `;
   parentElem.appendChild(div);
-  if(post.replies) Object.entries(post.replies).forEach(([id,r])=>renderPostRecursive({...r,id},div.querySelector(`#replies-${post.id}`),topicId));
+
+  // 点击帖子内容显示回复框
+  const postContentEl = div.querySelector(`#postContent-${post.id}`);
+  const replyBoxEl = div.querySelector(`#replyBox-${post.id}`);
+  postContentEl.addEventListener('click',()=>{ replyBoxEl.classList.remove('hidden'); replyBoxEl.querySelector('input').focus(); });
+
+  // 渲染子回复
+  const repliesEl = div.querySelector(`#replies-${post.id}`);
+  const toggleEl = div.querySelector(`#toggle-${post.id}`);
+  if(post.replies){
+    toggleEl.classList.remove('hidden');
+    Object.entries(post.replies).forEach(([rid, rp]) => 
+      renderPostRecursive({...rp, id: rid}, repliesEl, topicId, `${postPath}/replies`)
+    );
+    toggleEl.innerText = `Show Replies (${Object.keys(post.replies).length})`;
+    toggleEl.addEventListener('click', ()=>{
+      repliesEl.classList.toggle('hidden');
+      toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
+    });
+  }
+
   lucide.createIcons();
 }
 
-// 点赞
-window.likePost=function(postId){
-  const postRef=ref(db,`topics/${currentTopicId}/posts/${postId}/likes/${currentUserId}`);
-  onValue(postRef,snap=>{
-    if(snap.exists()) remove(postRef);
-    else set(postRef,true);
-  },{onlyOnce:true});
-}
-
-// 删除帖子
-window.deletePost=function(postId){
-  if(!confirm("Delete this post?")) return;
-  remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));
-}
-
-// 回复帖子
-window.replyPost=function(postId){
-  const input=document.getElementById(`replyInput-${postId}`);
-  const val=input.value.trim(); if(!val) return;
-  const newRef=push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`));
-  set(newRef,{authorName:currentUserName,authorUid:currentUserId,content:val,timestamp:Date.now()});
-  input.value='';
-}
-
 // 发布新帖子
-postBtn.addEventListener('click',()=>{
-  const val=newPostContent.value.trim(); if(!val) return;
-  const newRef=push(ref(db,`topics/${currentTopicId}/posts`));
-  set(newRef,{authorName:currentUserName,authorUid:currentUserId,content:val,timestamp:Date.now()});
-  newPostContent.value='';
+postBtn.addEventListener('click', ()=>{
+  const val = newPostContent.value.trim(); 
+  if(!val) return alert("Enter post content"); 
+  push(ref(db, `topics/${currentTopicId}/posts`), {authorName: currentUserName, authorUid: currentUser.uid, content: val, timestamp: Date.now()}); 
+  newPostContent.value=''; editorStatus.innerText='Posted'; 
+  setTimeout(()=>editorStatus.innerText='',1000);
+});
+
+// 点赞
+window.likePost = function(postPath){
+  const likeRef = ref(db, `topics/${currentTopicId}/${postPath}/likes/${currentUser.uid}`);
+  onValue(likeRef, snap => { snap.exists()?remove(likeRef):set(likeRef,true); }, {onlyOnce:true});
+}
+
+// 删除帖子/回复
+window.deletePost = function(path){
+  if(!confirm("Delete this post?")) return;
+  remove(ref(db, `topics/${currentTopicId}/${path}`));
+}
+
+// 删除话题
+deleteTopicBtn.addEventListener('click', ()=>{
+  if(!confirm("Delete entire topic?")) return;
+  remove(ref(db, `topics/${currentTopicId}`));
+  currentTopicId=null; topicPage.classList.add('hidden'); forumPage.classList.remove('hidden');
 });
 </script>
 </body>
