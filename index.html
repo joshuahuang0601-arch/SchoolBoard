@@ -117,6 +117,9 @@ const ADMIN_ID = "ADMINISTRATOR";
 
 let topicsCache = {};
 let currentTopicId = null;
+  // ---------- 保存回复展开状态 ----------
+let repliesOpenState = {}; // key = postId 或 replyId, value = true/false
+
 
 // UI elements
 const welcome = document.getElementById('welcome-screen');
@@ -281,7 +284,7 @@ function renderTopicPage(topicId){
   posts.forEach(p => { renderPostRecursive(p, postsContainer, topicId); });
 }
 // ---------- Recursive Post Rendering ----------
-function renderPostRecursive(post, parentElem, topicId){
+function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
@@ -291,18 +294,18 @@ function renderPostRecursive(post, parentElem, topicId){
   div.innerHTML = `
     <div class="flex justify-between items-start" id="postHeader-${post.id}">
       <div>
-        <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
-        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName || "Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp || 0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
-        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
         <span class="text-sm">${likesCount}</span>
         ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
     <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
-    <span class="collapse-toggle hidden" id="toggle-${post.id}">Show Replies</span>
-    <div id="replies-${post.id}" class="mt-2 hidden"></div>
+    <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
+    <div id="replies-${post.id}" class="mt-2 ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? '' : 'hidden'}"></div>
     <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full" 
              onkeypress="if(event.key==='Enter'){submitReply('${post.id}',this.value); this.value=''; this.parentElement.classList.add('hidden');}">
@@ -315,41 +318,62 @@ function renderPostRecursive(post, parentElem, topicId){
   const repliesEl = div.querySelector(`#replies-${post.id}`);
   const toggleEl = div.querySelector(`#toggle-${post.id}`);
 
-  postContentEl.addEventListener('click', ()=>{ 
+  // 点击内容显示 reply 输入框
+  postContentEl.addEventListener('click', () => {
     const box = document.getElementById(`replyBox-${post.id}`);
-    box.classList.remove('hidden'); 
+    box.classList.remove('hidden');
     box.querySelector('input').focus();
   });
 
-  // ---------- Recursive Reply Rendering ----------
-function renderReplyRecursive(reply, parentElem, topicId, parentPostId){
+  // 展开/折叠回复
+  if (post.replies) {
+    toggleEl.addEventListener('click', () => {
+      const expanded = !repliesEl.classList.contains('hidden');
+      repliesEl.classList.toggle('hidden');
+      toggleEl.innerText = expanded ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
+      localStorage.setItem(`repliesExpanded-${post.id}`, !expanded);
+    });
+
+    Object.entries(post.replies).forEach(([rid, rp]) => {
+      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, post.id, 1);
+    });
+  }
+
+  lucide.createIcons();
+}
+
+// ---------- Recursive Reply Rendering ----------
+function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 1) {
   const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
   const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
 
   const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  div.className = `bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply`;
+  div.style.marginLeft = `${level * 1}rem`; // 控制缩进
   div.innerHTML = `
     <div class="flex justify-between items-start">
       <div>
-        <div class="font-medium text-gray-700">${escapeHtml(reply.authorName||"Anonymous")}</div>
-        <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp||0)}</div>
+        <div class="font-medium text-gray-700">${escapeHtml(reply.authorName || "Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp || 0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
-        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked?'text-blue-600':'text-gray-400'} w-5 h-5"></i>
+        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
         <span class="text-sm">${likesCount}</span>
         ${canDelete ? `<i onclick="deleteReply('${parentPostId}','${reply.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
     <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
-    <div id="replies-${reply.id}" class="mt-2"></div>
+    <div id="replies-${reply.id}" class="mt-2 ${localStorage.getItem(`repliesExpanded-${reply.id}`) === 'true' ? '' : 'hidden'}"></div>
   `;
   parentElem.appendChild(div);
 
-  // Render nested replies
-  if(reply.replies){
-    Object.entries(reply.replies).forEach(([rid,rp])=>{
-      renderReplyRecursive({...rp,id:rid}, div.querySelector(`#replies-${reply.id}`), topicId, parentPostId);
+  const repliesEl = div.querySelector(`#replies-${reply.id}`);
+
+  // 递归渲染子回复
+  if (reply.replies) {
+    Object.entries(reply.replies).forEach(([rid, rp]) => {
+      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
     });
   }
 
