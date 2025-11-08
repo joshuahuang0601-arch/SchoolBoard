@@ -147,6 +147,26 @@ const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 const userIdTag = document.getElementById('userIdTag');
 
+// 点赞帖子
+window.toggleLikePost = function(postId){
+  if(!currentUser?.uid) return; // 确保用户已登录
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
+  get(likeRef).then(snap => {
+    if(snap.exists()) remove(likeRef);
+    else set(likeRef, true);
+  });
+};
+
+// 点赞回复
+window.toggleLikeReply = function(postId, replyId){
+  if(!currentUser?.uid) return;
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+  get(likeRef).then(snap => {
+    if(snap.exists()) remove(likeRef);
+    else set(likeRef, true);
+  });
+};
+
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
   
