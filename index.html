@@ -114,77 +114,62 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
 const auth = getAuth(app);
-
-// --- 全局变量 ---
-let currentUser = null;
-let currentUserName = null;
-let currentUserID = null; 
-let topicsCache = {};
-let currentTopicId = null;
+const db = getDatabase(app);
 
 // --- DOM ---
 const welcome = document.getElementById('welcome-screen');
 const forumPage = document.getElementById('forumPage');
-const topicPage = document.getElementById('topicPage');
-const forumContainer = document.getElementById('forumContainer');
-const topicPageName = document.getElementById('topicPageName');
-const topicPageDesc = document.getElementById('topicPageDesc');
-const postsContainer = document.getElementById('postsContainer');
-const deleteTopicBtn = document.getElementById('deleteTopicBtn');
-const backToForumBtn = document.getElementById('backToForumBtn');
-const topicNameInput = document.getElementById('topicName');
-const topicDescInput = document.getElementById('topicDesc');
-const createTopicBtn = document.getElementById('createTopicBtn');
-const saveDraftBtn = document.getElementById('saveDraftBtn');
-const draftsContainer = document.getElementById('draftsContainer');
-const newPostContent = document.getElementById('newPostContent');
-const postBtn = document.getElementById('postBtn');
-const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 
-// --- 工具函数 ---
-function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
-function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
-function randomID(){return Math.random().toString(36).substring(2,10);}
-
-// --- 登录 DOM ---
-const emailInput = document.getElementById('emailInput');
-const passwordInput = document.getElementById('passwordInput');
-const phoneInput = document.getElementById('phoneInput');
-const displayNameInput = document.getElementById('displayNameInput');
-const anonNameInput = document.getElementById('anonNameInput');
 const emailLoginBtn = document.getElementById('emailLoginBtn');
 const phoneLoginBtn = document.getElementById('phoneLoginBtn');
 const anonLoginBtn = document.getElementById('anonLoginBtn');
 
-function loginSuccess(user,name,id){
+const displayNameInput = document.getElementById('displayNameInput');
+const anonNameInput = document.getElementById('anonNameInput');
+const emailInput = document.getElementById('emailInput');
+const passwordInput = document.getElementById('passwordInput');
+const phoneInput = document.getElementById('phoneInput');
+
+// --- 全局用户信息 ---
+let currentUser = null;
+let currentUserName = null;
+let currentUserID = null; // 仅注册用户有ID
+
+// --- 登录成功函数 ---
+function loginSuccess(user, name, id){
+  console.log("登录成功", user);
   currentUser = user;
   currentUserName = name;
   currentUserID = id || null;
   userTag.innerText = id ? `${name} (${id})` : name;
+
   welcome.remove();
   forumPage.classList.remove('hidden');
   forumPage.style.opacity = 1;
+
+  // 初始化论坛数据监听
   initRealtime();
 }
 
 // --- 匿名登录（设备绑定） ---
 let storedAnonUid = localStorage.getItem('anonUid');
 let storedAnonName = localStorage.getItem('anonName') || 'Anonymous';
-
 anonLoginBtn.addEventListener('click', ()=>{
   const name = anonNameInput.value.trim() || storedAnonName;
   localStorage.setItem('anonName', name);
+
   if(storedAnonUid){
     loginSuccess({uid: storedAnonUid}, name, null);
   } else {
-    signInAnonymously(auth).then(u=>{
-      storedAnonUid = u.user.uid;
-      localStorage.setItem('anonUid', storedAnonUid);
-      loginSuccess(u.user, name, null);
-    });
+    signInAnonymously(auth)
+      .then(u=>{
+        storedAnonUid = u.user.uid;
+        localStorage.setItem('anonUid', storedAnonUid);
+        loginSuccess(u.user, name, null);
+      })
+      .catch(err=>alert("匿名登录失败: " + err.message));
   }
 });
 
@@ -192,16 +177,19 @@ anonLoginBtn.addEventListener('click', ()=>{
 emailLoginBtn.addEventListener('click', ()=>{
   const name = displayNameInput.value.trim() || "User";
   const email = emailInput.value.trim();
-  const pw = passwordInput.value;
-  if(!email || !pw) return alert("Email/Password required");
+  const pw = passwordInput.value.trim();
+  if(!email || !pw) return alert("请输入邮箱和密码");
 
-  signInWithEmailAndPassword(auth,email,pw)
+  signInWithEmailAndPassword(auth, email, pw)
     .then(u=>loginSuccess(u.user, name, u.user.uid))
     .catch(err=>{
       if(err.code==='auth/user-not-found'){
         createUserWithEmailAndPassword(auth,email,pw)
-          .then(u=>loginSuccess(u.user, name, u.user.uid));
-      } else alert(err.message);
+          .then(u=>loginSuccess(u.user, name, u.user.uid))
+          .catch(e=>alert("注册失败: "+e.message));
+      } else {
+        alert("登录失败: "+err.message);
+      }
     });
 });
 
@@ -210,25 +198,28 @@ window.recaptchaVerifier = new RecaptchaVerifier('loginPanel', { 'size': 'invisi
 phoneLoginBtn.addEventListener('click', ()=>{
   const name = displayNameInput.value.trim() || "User";
   const phone = phoneInput.value.trim();
-  if(!phone) return alert("Enter phone number");
+  if(!phone) return alert("请输入手机号");
+
   signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
     .then(confirmationResult=>{
-      const code = prompt("Enter verification code:");
+      const code = prompt("请输入验证码");
       return confirmationResult.confirm(code);
     })
     .then(u=>loginSuccess(u.user, name, u.user.uid))
-    .catch(console.error);
+    .catch(err=>alert("手机号登录失败: "+err.message));
 });
 
-// --- 初始化实时数据 ---
+// --- Firebase 数据监听 ---
 function initRealtime(){
-  onValue(ref(db,'topics'),snap=>{
-    topicsCache = snap.val() || {};
-    renderForum();
-    renderDrafts();
-    if(currentTopicId) renderTopicPage(currentTopicId);
+  const topicsRef = ref(db,'topics');
+  onValue(topicsRef, snap=>{
+    window.topicsCache = snap.val() || {};
+    if(typeof renderForum === "function") renderForum();
+    if(typeof renderDrafts === "function") renderDrafts();
   });
 }
+
+
 
 // --- DOM 引用 ---
 const forumContainer = document.getElementById('forumContainer');
