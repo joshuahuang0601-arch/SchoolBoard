@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SchoolBoard - Forum</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); min-height: 100vh; overflow-x: hidden; }
-    .fade { transition: opacity 0.45s ease; }
-    .hidden { display: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SchoolBoard - Forum</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); min-height:100vh; }
+  .fade { transition: opacity 0.4s ease; }
+  .hidden { display: none; }
+  .panel { position: fixed; top:0; right:0; height:100%; width:100%; max-width:24rem; background:white; z-index:50; transform:translateX(100%); transition: transform 0.3s; }
+</style>
 </head>
 <body class="min-h-screen">
 
@@ -22,7 +23,6 @@
 
 <!-- Main App -->
 <div id="app" class="hidden fade opacity-0">
-
   <header class="bg-white shadow-md">
     <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -36,40 +36,29 @@
         <button id="draftsBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2">
           <i data-lucide="archive" class="w-4 h-4"></i> Drafts
         </button>
+        <button id="favoritesBtn" class="px-3 py-2 bg-yellow-400 text-white rounded-md hover:bg-yellow-500 flex items-center gap-2">
+          <i data-lucide="star" class="w-4 h-4"></i> Favorites
+        </button>
         <div id="userTag" class="text-sm text-gray-600"></div>
       </div>
     </div>
   </header>
 
-  <!-- Post editor -->
   <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <!-- Create Topic -->
     <div class="bg-white rounded-lg shadow-lg p-6">
-      <h2 class="text-xl font-bold mb-4 text-gray-800">Create a Forum Post</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-        <input id="author" placeholder="Your name" class="col-span-1 md:col-span-1 px-4 py-2 border rounded-lg" />
-        <input id="title" placeholder="Title" class="col-span-1 md:col-span-2 px-4 py-2 border rounded-lg" />
-      </div>
-      <textarea id="contentText" placeholder="Write your message..." rows="4" class="w-full px-4 py-3 border rounded-lg mb-3 resize-none"></textarea>
-      <div class="flex items-center gap-3">
-        <button id="postBtn" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Post</button>
-        <button id="saveDraftBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">Save Draft</button>
-        <span id="editorStatus" class="text-sm text-gray-500 ml-3"></span>
-      </div>
+      <h2 class="text-xl font-bold mb-4 text-gray-800">Create New Topic</h2>
+      <input id="topicName" placeholder="Topic name" class="w-full px-4 py-2 border rounded-lg mb-3">
+      <button id="createTopicBtn" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Create Topic</button>
     </div>
 
-    <!-- Search -->
-    <div class="relative">
-      <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
-      <input id="search" type="text" placeholder="Search..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-    </div>
-
-    <!-- Posts -->
-    <div id="content" class="space-y-6"></div>
+    <!-- Forum Topics -->
+    <div id="forumContainer" class="space-y-4"></div>
   </div>
 </div>
 
-<!-- Drafts panel -->
-<div id="draftsPanel" class="fixed right-0 top-0 h-full w-full md:w-96 bg-white shadow-lg z-50 transform translate-x-full transition-transform duration-300">
+<!-- Drafts Panel -->
+<div id="draftsPanel" class="panel">
   <div class="p-4 border-b flex items-center justify-between">
     <h3 class="text-lg font-semibold">Your Drafts</h3>
     <div class="flex items-center gap-2">
@@ -83,12 +72,46 @@
   </div>
 </div>
 
+<!-- Favorites Panel -->
+<div id="favoritesPanel" class="panel">
+  <div class="p-4 border-b flex items-center justify-between">
+    <h3 class="text-lg font-semibold">Your Favorites</h3>
+    <button id="closeFavorites" class="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"><i data-lucide="x" class="w-4 h-4"></i></button>
+  </div>
+  <div class="p-4 overflow-auto h-[calc(100vh-72px)]" id="favoritesList"></div>
+</div>
+
+<!-- Topic Modal -->
+<div id="topicModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white w-full max-w-3xl mx-auto p-6 rounded-lg max-h-[90vh] overflow-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 id="topicModalName" class="text-xl font-bold text-gray-800">Topic</h3>
+      <button id="closeTopicModal" class="text-gray-500 hover:text-gray-800"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+
+    <!-- New Post -->
+    <div class="mb-4">
+      <textarea id="newPostContent" placeholder="Write your post..." rows="3" class="w-full px-4 py-2 border rounded-lg mb-2 resize-none"></textarea>
+      <div class="flex gap-2">
+        <button id="postBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Post</button>
+        <button id="saveDraftBtn" class="bg-gray-200 text-gray-800 px-3 py-2 rounded-lg hover:bg-gray-300">Save Draft</button>
+        <span id="editorStatus" class="text-sm text-gray-500 ml-2"></span>
+      </div>
+      <div id="deleteAllPostsContainer" class="mt-2 hidden">
+        <button id="deleteAllPostsBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">Delete All Posts (Topic Author)</button>
+      </div>
+    </div>
+
+    <!-- Posts List -->
+    <div id="postsContainer" class="space-y-3"></div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, set, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
   authDomain: "schoolboard-942bc.firebaseapp.com",
@@ -98,57 +121,64 @@ const firebaseConfig = {
   messagingSenderId: "530189085355",
   appId: "1:530189085355:web:6d2706eb965a7c5bf125ee"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// DOM
 const welcome = document.getElementById('welcome-screen');
 const appRoot = document.getElementById('app');
+const forumContainer = document.getElementById('forumContainer');
 const draftsBtn = document.getElementById('draftsBtn');
 const draftsPanel = document.getElementById('draftsPanel');
 const closeDrafts = document.getElementById('closeDrafts');
 const draftsList = document.getElementById('draftsList');
 const emptyDrafts = document.getElementById('emptyDrafts');
 const newDraftBtn = document.getElementById('newDraftBtn');
-const postBtn = document.getElementById('postBtn');
-const saveDraftBtn = document.getElementById('saveDraftBtn');
-const authorInput = document.getElementById('author');
-const titleInput = document.getElementById('title');
-const contentInput = document.getElementById('contentText');
-const contentContainer = document.getElementById('content');
-const searchInput = document.getElementById('search');
-const editorStatus = document.getElementById('editorStatus');
+const topicNameInput = document.getElementById('topicName');
+const createTopicBtn = document.getElementById('createTopicBtn');
 const userTag = document.getElementById('userTag');
 
-let currentUser=null;
-let currentEditingDraftId=null;
-let draftsCache={};
-let postsCache={};
-const postsPath="posts/forum";
-function draftsBasePath(uid){return `drafts/${uid}`;}
+const favoritesBtn = document.getElementById('favoritesBtn');
+const favoritesPanel = document.getElementById('favoritesPanel');
+const closeFavorites = document.getElementById('closeFavorites');
+const favoritesList = document.getElementById('favoritesList');
 
-// Utils
-function timeAgo(ts){const diff=Math.floor((Date.now()-ts)/1000);if(diff<60) return "Just now"; if(diff<3600) return `${Math.floor(diff/60)} minutes ago`; if(diff<86400) return `${Math.floor(diff/3600)} hours ago`; return `${Math.floor(diff/86400)} days ago`;}
-function escapeHtml(str){if(!str) return ""; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
+const topicModal = document.getElementById('topicModal');
+const topicModalName = document.getElementById('topicModalName');
+const closeTopicModal = document.getElementById('closeTopicModal');
+const newPostContent = document.getElementById('newPostContent');
+const postBtn = document.getElementById('postBtn');
+const saveDraftBtn = document.getElementById('saveDraftBtn');
+const editorStatus = document.getElementById('editorStatus');
+const postsContainer = document.getElementById('postsContainer');
+const deleteAllPostsContainer = document.getElementById('deleteAllPostsContainer');
+const deleteAllPostsBtn = document.getElementById('deleteAllPostsBtn');
 
-// ---------- Auth with fixed UID ----------
-let storedUid=localStorage.getItem('anonUid');
+let currentUser = null;
+let topicsCache = {};
+let favoritesCache = {};
+let draftsCache = {};
+let currentTopicId = null;
+let currentEditingDraftId = null;
+
+// ---------- Auth ----------
+let storedUid = localStorage.getItem('anonUid');
 if(!storedUid){
   signInAnonymously(auth).then(u=>{
-    storedUid=u.user.uid;
-    localStorage.setItem('anonUid',storedUid);
-    currentUser=u.user;
-    userTag.innerText=`User: ${storedUid.slice(0,8)}`;
+    storedUid = u.user.uid;
+    localStorage.setItem('anonUid', storedUid);
+    currentUser = u.user;
+    userTag.innerText = `User: ${storedUid.slice(0,8)}`;
     initRealtime();
   }).catch(console.error);
 }else{
-  currentUser={uid:storedUid};
-  userTag.innerText=`User: ${storedUid.slice(0,8)}`;
+  currentUser = {uid: storedUid};
+  userTag.innerText = `User: ${storedUid.slice(0,8)}`;
   initRealtime();
 }
 
-// ---------- Welcome click ----------
+// ---------- Welcome ----------
 lucide.createIcons();
 welcome.addEventListener('click',()=>{
   welcome.style.opacity=0;
@@ -160,77 +190,194 @@ welcome.addEventListener('click',()=>{
   },400);
 });
 
-// ---------- Drafts panel ----------
-draftsBtn.addEventListener('click',()=>{draftsPanel.style.transform='translateX(0)';loadUserDrafts();});
-closeDrafts.addEventListener('click',()=>{draftsPanel.style.transform='translateX(100%)';});
-newDraftBtn.addEventListener('click',()=>{
-  currentEditingDraftId=null;
-  authorInput.value='';
-  titleInput.value='';
-  contentInput.value='';
-  editorStatus.innerText="New draft - unsaved";
-});
-
 // ---------- Realtime ----------
 function initRealtime(){
-  onValue(ref(db,postsPath),snap=>{postsCache=snap.val()||{};renderPosts(Object.entries(postsCache).map(([id,p])=>({id,...p})));});
-  if(currentUser) loadUserDrafts();
+  onValue(ref(db,'topics'),snap=>{
+    topicsCache = snap.val() || {};
+    renderTopics();
+    renderFavoritesPanel();
+  });
+  onValue(ref(db,`favorites/${currentUser.uid}`),snap=>{
+    favoritesCache = snap.val() || {};
+    renderTopics();
+    renderFavoritesPanel();
+  });
+  onValue(ref(db,`drafts/${currentUser.uid}`),snap=>{
+    draftsCache = snap.val() || {};
+    renderDraftsList();
+  });
 }
 
-// ---------- Render Forum ----------
-function renderPosts(arr){
-  arr.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
-  const q=searchInput.value.trim().toLowerCase();
-  const filtered=arr.filter(p=>{
-    if(!q) return true;
-    return (p.title||"").toLowerCase().includes(q)||(p.content||"").toLowerCase().includes(q)||(p.author||"").toLowerCase().includes(q);
+// ---------- Forum ----------
+function renderTopics(){
+  const arr = Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=>{
+    const aFav = favoritesCache[a.id]?1:0;
+    const bFav = favoritesCache[b.id]?1:0;
+    if(aFav!==bFav) return bFav - aFav;
+    const aPosts = a.posts?Object.keys(a.posts).length:0;
+    const bPosts = b.posts?Object.keys(b.posts).length:0;
+    return bPosts - aPosts;
   });
-  contentContainer.innerHTML=filtered.map(p=>{
-    const comments=p.comments?Object.entries(p.comments).map(([cid,c])=>({id:cid,...c})):[];  
-    const commentsHtml=comments.length>0?comments.map(c=>`<div class="mt-2"><div class="flex items-baseline gap-2"><span class="font-medium text-gray-700">${escapeHtml(c.author)}</span><span class="text-sm text-gray-400 ml-1">${timeAgo(c.timestamp||0)}</span></div><div class="text-gray-600">${escapeHtml(c.content)}</div></div>`).join(""):`<p class="text-gray-400 text-sm">No comments yet.</p>`;
-    return `<div class="bg-white p-4 rounded-lg shadow mb-6"><div class="flex justify-between mb-1"><span class="font-semibold text-gray-800">${escapeHtml(p.author||"Anonymous")}</span><span class="text-sm text-gray-500">${timeAgo(p.timestamp||0)}</span></div><h3 class="font-bold text-lg text-gray-900">${escapeHtml(p.title||"(no title)")}</h3><p class="text-gray-700 mt-1 mb-3">${escapeHtml(p.content||"")}</p><div class="pl-4 border-l-4 border-indigo-100">${commentsHtml}<div class="mt-3 flex gap-2"><input id="comment-author-${p.id}" placeholder="Your name" class="flex-1 px-2 py-1 border rounded"><input id="comment-content-${p.id}" placeholder="Add a comment..." class="flex-1 px-2 py-1 border rounded"><button data-post="${p.id}" class="comment-btn bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Comment</button></div></div></div>`;
-  }).join("");
-  document.querySelectorAll('.comment-btn').forEach(btn=>{btn.onclick=e=>{const pid=e.currentTarget.dataset.post;const a=document.getElementById(`comment-author-${pid}`).value.trim();const c=document.getElementById(`comment-content-${pid}`).value.trim();if(!a||!c)return alert("Enter name & comment");push(ref(db,`${postsPath}/${pid}/comments`),{author:a,content:c,timestamp:Date.now()}).then(()=>{document.getElementById(`comment-author-${pid}`).value="";document.getElementById(`comment-content-${pid}`).value="";});}});
+  forumContainer.innerHTML = arr.map(t=>{
+    const fav = favoritesCache[t.id]?true:false;
+    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between items-center cursor-pointer">
+      <div class="flex-1" onclick="openTopic('${t.id}')">
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-sm text-gray-500">by ${escapeHtml(t.author)}</p>
+      </div>
+      <button onclick="toggleFavorite(event,'${t.id}')" class="px-2 py-1 rounded ${fav?'bg-yellow-400':'bg-gray-200'}">⭐</button>
+    </div>`;
+  }).join('');
   lucide.createIcons();
 }
 
-// ---------- Post & Save Draft ----------
+function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
+
+// ---------- Favorites ----------
+window.toggleFavorite = function(e,topicId){
+  e.stopPropagation();
+  const favRef = ref(db,`favorites/${currentUser.uid}/${topicId}`);
+  if(favoritesCache[topicId]) remove(favRef);
+  else set(favRef,true);
+};
+
+favoritesBtn.addEventListener('click',()=>{favoritesPanel.style.transform='translateX(0)'; renderFavoritesPanel();});
+closeFavorites.addEventListener('click',()=>{favoritesPanel.style.transform='translateX(100%)';});
+
+function renderFavoritesPanel(){
+  const arr = Object.entries(favoritesCache||{}).map(([id])=>({id,...(topicsCache[id]||{})}));
+  if(arr.length===0){favoritesList.innerHTML='<p class="text-gray-500 text-center py-8">No favorites yet.</p>'; return;}
+  arr.sort((a,b)=>{
+    const aPosts = a.posts?Object.keys(a.posts).length:0;
+    const bPosts = b.posts?Object.keys(b.posts).length:0;
+    return bPosts - aPosts;
+  });
+  favoritesList.innerHTML = arr.map(t=>{
+    return `<div class="bg-white p-3 rounded shadow flex justify-between items-center cursor-pointer">
+      <div class="flex-1" onclick="openTopic('${t.id}')">
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-sm text-gray-500">by ${escapeHtml(t.author)}</p>
+      </div>
+      <button onclick="toggleFavorite(event,'${t.id}')" class="px-2 py-1 rounded bg-yellow-400">⭐</button>
+    </div>`;
+  }).join('');
+  lucide.createIcons();
+}
+
+// ---------- Create Topic ----------
+createTopicBtn.addEventListener('click',()=>{
+  const name = topicNameInput.value.trim();
+  if(!name) return alert("Enter topic name");
+  push(ref(db,'topics'),{
+    topicName: name,
+    author: "Anonymous",
+    timestamp: Date.now()
+  });
+  topicNameInput.value='';
+});
+
+// ---------- Topic Modal ----------
+window.openTopic = function(topicId){
+  currentTopicId = topicId;
+  const topic = topicsCache[topicId];
+  topicModalName.innerText = topic.topicName;
+  topicModal.classList.remove('hidden');
+  deleteAllPostsContainer.style.display = (topic.author===currentUser.uid)?'block':'none';
+  newPostContent.value=''; editorStatus.innerText='';
+  renderPosts();
+}
+closeTopicModal.addEventListener('click',()=>{topicModal.classList.add('hidden'); currentTopicId=null;});
+
+// ---------- Posts ----------
+function renderPosts(){
+  const topic = topicsCache[currentTopicId];
+  if(!topic) return;
+  const posts = topic.posts?Object.entries(topic.posts).map(([id,p])=>({id,...p})):[];  
+  posts.sort((a,b)=> (b.timestamp||0) - (a.timestamp||0));
+  postsContainer.innerHTML = posts.map(p=>{
+    const canDelete = (p.authorUid===currentUser.uid) || (topic.author===currentUser.uid);
+    return `<div class="bg-gray-50 p-3 rounded shadow">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="font-medium text-gray-700">${escapeHtml(p.authorName||"Anonymous")}</div>
+          <div class="text-gray-400 text-sm">${timeAgo(p.timestamp||0)}</div>
+        </div>
+        ${canDelete?`<button onclick="deletePost('${p.id}')" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm">Delete</button>`:''}
+      </div>
+      <div class="mt-2 text-gray-700">${escapeHtml(p.content)}</div>
+    </div>`;
+  }).join('');
+}
+
 postBtn.addEventListener('click',()=>{
-  const a=authorInput.value.trim()||"Anonymous", t=titleInput.value.trim(), c=contentInput.value.trim();
-  if(!t||!c) return alert("Please fill in a title and content.");
-  push(ref(db,postsPath),{author:a,title:t,content:c,timestamp:Date.now()}).then(()=>{
-    if(currentEditingDraftId) remove(ref(db,`${draftsBasePath(currentUser.uid)}/${currentEditingDraftId}`));
-    currentEditingDraftId=null;authorInput.value="";titleInput.value="";contentInput.value="";editorStatus.innerText="Posted";
-  });
+  const val = newPostContent.value.trim();
+  if(!val) return alert("Enter post content");
+  const postData = {authorName:"Anonymous",authorUid:currentUser.uid,content:val,timestamp:Date.now()};
+  push(ref(db,`topics/${currentTopicId}/posts`),postData).then(()=>{newPostContent.value=''; editorStatus.innerText="Posted";});
 });
+
+function deletePost(postId){
+  if(!confirm("Delete this post?")) return;
+  remove(ref(db,`topics/${currentTopicId}/posts/${postId}`));
+}
+
+deleteAllPostsBtn.addEventListener('click',()=>{
+  if(!confirm("Delete all posts in this topic?")) return;
+  remove(ref(db,`topics/${currentTopicId}/posts`));
+});
+
+// ---------- Drafts ----------
+draftsBtn.addEventListener('click',()=>{draftsPanel.style.transform='translateX(0)'; renderDraftsList();});
+closeDrafts.addEventListener('click',()=>{draftsPanel.style.transform='translateX(100%)';});
+newDraftBtn.addEventListener('click',()=>{
+  currentEditingDraftId=null; newPostContent.value=''; editorStatus.innerText='New Draft';
+  draftsPanel.style.transform='translateX(100%)';
+  topicModal.classList.remove('hidden');
+});
+
 saveDraftBtn.addEventListener('click',()=>{
-  const a=authorInput.value.trim(), t=titleInput.value.trim(), c=contentInput.value.trim();
-  if(!a&&!t&&!c) return alert("Draft empty");
-  const base=draftsBasePath(currentUser.uid);
+  const val = newPostContent.value.trim();
+  if(!val) return alert("Enter content");
   if(currentEditingDraftId){
-    update(ref(db,`${base}/${currentEditingDraftId}`),{author:a,title:t,content:c,timestamp:Date.now()}).then(()=>editorStatus.innerText="Draft updated");
+    update(ref(db,`drafts/${currentUser.uid}/${currentEditingDraftId}`),{content:val,timestamp:Date.now()});
   }else{
-    push(ref(db,base),{author:a,title:t,content:c,timestamp:Date.now()}).then(()=>editorStatus.innerText="Draft saved");
+    push(ref(db,`drafts/${currentUser.uid}`),{content:val,timestamp:Date.now()});
   }
+  editorStatus.innerText="Saved Draft";
 });
 
-// ---------- Load Drafts ----------
-function loadUserDrafts(){
-  onValue(ref(db,draftsBasePath(currentUser.uid)),snap=>{draftsCache=snap.val()||{};renderDraftsList();});
-}
 function renderDraftsList(){
-  const entries=Object.entries(draftsCache||{});
-  if(entries.length===0){draftsList.innerHTML="";emptyDrafts.style.display="block";return;}
-  emptyDrafts.style.display="none";
-  draftsList.innerHTML=entries.sort((a,b)=>b[1].timestamp-a[1].timestamp).map(([id,d])=>`<div class="border rounded p-3"><div class="flex justify-between items-start gap-2"><div><div class="font-medium text-gray-800">${escapeHtml(d.title||"(no title)")}</div><div class="text-gray-500 text-sm">${escapeHtml(d.author||"Anonymous")} · ${timeAgo(d.timestamp||0)}</div></div><div class="flex gap-2"><button data-id="${id}" class="edit-draft px-2 py-1 bg-yellow-100 rounded hover:bg-yellow-200 text-sm">Edit</button><button data-id="${id}" class="publish-draft px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">Publish</button><button data-id="${id}" class="delete-draft px-2 py-1 bg-red-100 rounded hover:bg-red-200 text-sm">Delete</button></div></div><div class="text-gray-700 mt-2">${escapeHtml((d.content||"").slice(0,200))}${(d.content||"").length>200?"...":""}</div></div>`).join("");
-  draftsList.querySelectorAll('.edit-draft').forEach(btn=>btn.onclick=e=>{const id=e.currentTarget.dataset.id;const d=draftsCache[id];currentEditingDraftId=id;authorInput.value=d.author||"";titleInput.value=d.title||"";contentInput.value=d.content||"";editorStatus.innerText="Editing draft";});
-  draftsList.querySelectorAll('.publish-draft').forEach(btn=>btn.onclick=e=>{const id=e.currentTarget.dataset.id;const d=draftsCache[id];push(ref(db,postsPath),{author:d.author,title:d.title,content:d.content,timestamp:Date.now()}).then(()=>remove(ref(db,`${draftsBasePath(currentUser.uid)}/${id}`)).then(()=>{currentEditingDraftId=null;authorInput.value="";titleInput.value="";contentInput.value="";editorStatus.innerText="Posted";}));});
-  draftsList.querySelectorAll('.delete-draft').forEach(btn=>btn.onclick=e=>{const id=e.currentTarget.dataset.id;if(confirm("Delete draft?")) remove(ref(db,`${draftsBasePath(currentUser.uid)}/${id}`));});
-  lucide.createIcons();
+  const arr = Object.entries(draftsCache||{}).map(([id,d])=>({id,...d}));
+  if(arr.length===0){emptyDrafts.style.display='block'; draftsList.innerHTML=''; return;}
+  emptyDrafts.style.display='none';
+  draftsList.innerHTML = arr.map(d=>{
+    return `<div class="bg-gray-50 p-3 rounded shadow flex justify-between items-start">
+      <div class="flex-1 cursor-pointer" onclick="editDraft('${d.id}')">${escapeHtml(d.content)}</div>
+      <button onclick="deleteDraft('${d.id}')" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Delete</button>
+    </div>`;
+  }).join('');
 }
 
-searchInput.addEventListener('input',()=>{renderPosts(Object.entries(postsCache||{}).map(([id,p])=>({id,...p})));});
-</script>
+window.editDraft = function(draftId){
+  currentEditingDraftId=draftId;
+  newPostContent.value=draftsCache[draftId].content;
+  topicModal.classList.remove('hidden');
+  draftsPanel.style.transform='translateX(100%)';
+  editorStatus.innerText='Editing Draft';
+}
+window.deleteDraft = function(draftId){ remove(ref(db,`drafts/${currentUser.uid}/${draftId}`)); }
 
+// ---------- Utils ----------
+function timeAgo(ts){
+  const diff = (Date.now()-ts)/1000;
+  if(diff<60) return 'Just now';
+  if(diff<3600) return `${Math.floor(diff/60)}m ago`;
+  if(diff<86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+</script>
+<script>lucide.createIcons();</script>
 </body>
 </html>
