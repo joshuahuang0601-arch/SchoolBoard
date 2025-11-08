@@ -88,7 +88,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebas
 import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-// Firebase Config (from previous provided config)
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
   authDomain: "schoolboard-942bc.firebaseapp.com",
@@ -103,6 +103,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+// ----------------- Global Variables -----------------
 let currentUser = null;
 let currentUserName = localStorage.getItem('anonName') || "User"+Math.floor(Math.random()*10000);
 localStorage.setItem('anonName', currentUserName);
@@ -114,14 +115,10 @@ if(!currentUserId){
 }
 
 const ADMIN_ID = "ADMINISTRATOR";
-
 let topicsCache = {};
 let currentTopicId = null;
-  // ---------- 保存回复展开状态 ----------
-let repliesOpenState = {}; // key = postId 或 replyId, value = true/false
 
-
-// UI elements
+// ---------- UI Elements ----------
 const welcome = document.getElementById('welcome-screen');
 const forumPage = document.getElementById('forumPage');
 const topicPage = document.getElementById('topicPage');
@@ -145,129 +142,50 @@ const userIdTag = document.getElementById('userIdTag');
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
 
-// Utilities
+// ----------------- Utilities -----------------
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
+function isAdmin() { return currentUserId === ADMIN_ID; }
 
-// Auth
-let storedUid = localStorage.getItem('anonUid');
-if(!storedUid){
-  signInAnonymously(auth).then(u=>{
-    storedUid=u.user.uid;
-    localStorage.setItem('anonUid',storedUid);
-    currentUser=u.user;
-    initRealtime();
-  }).catch(console.error);
-}else{
-  currentUser={uid:storedUid};
-  initRealtime();
-}
-
-// Upload device ID and name to Firebase
-set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
-
-// Welcome
-document.addEventListener('DOMContentLoaded', () => {
-  const welcome = document.getElementById('welcome-screen');
-  const forumPage = document.getElementById('forumPage');
-
-  // Firebase 初始化
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-  const auth = getAuth(app);
-
-  let currentUser = null;
-  let currentUserName = localStorage.getItem('anonName') || "User"+Math.floor(Math.random()*10000);
-  localStorage.setItem('anonName', currentUserName);
-
-  let currentUserId = localStorage.getItem('deviceId');
-  if(!currentUserId){
-    currentUserId = Math.random().toString(36).substring(2,14).toUpperCase();
-    localStorage.setItem('deviceId', currentUserId);
-  }
-
-  const ADMIN_ID = "ADMINISTRATOR";
-
-  // 绑定欢迎界面点击
-  function showForumPage(){
-    forumPage.classList.remove('hidden');
+// ----------------- Anonymous Login & Welcome -----------------
+function showForumPage() {
+  forumPage.classList.remove('hidden');
+  setTimeout(()=>{
     forumPage.style.opacity = 1;
     welcome.style.opacity = 0;
     setTimeout(()=>welcome.remove(), 400);
-  }
+  },50);
+}
 
-  // 匿名登录
-  let storedUid = localStorage.getItem('anonUid');
-  if(!storedUid){
-    signInAnonymously(auth).then(u=>{
-      storedUid=u.user.uid;
-      localStorage.setItem('anonUid',storedUid);
-      currentUser=u.user;
+let storedUid = localStorage.getItem('anonUid');
+if(!storedUid){
+  signInAnonymously(auth).then(u=>{
+    currentUser = u.user;
+    storedUid = currentUser.uid;
+    localStorage.setItem('anonUid', storedUid);
 
-      // 上传用户信息
-      set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
+    // Upload user info
+    set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
 
-      // 点击 welcome 进入论坛
-      welcome.addEventListener('click', showForumPage);
-    }).catch(console.error);
-  } else {
-    currentUser={uid:storedUid};
-    // 点击 welcome 进入论坛
     welcome.addEventListener('click', showForumPage);
-  }
-});
+    initRealtime();
+  }).catch(console.error);
+}else{
+  currentUser = { uid: storedUid };
+  welcome.addEventListener('click', showForumPage);
+  initRealtime();
+}
 
-
-// Realtime listener
+// ----------------- Realtime Listener -----------------
 function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
-    topicsCache=snap.val()||{};
+    topicsCache = snap.val()||{};
     renderForum();
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
 }
 
-// ---------- User Name and ID Editing ----------
-userTag.addEventListener('click', ()=>{
-  const newName = prompt("Enter new display name:", currentUserName);
-  if(!newName) return;
-  currentUserName = newName;
-  userTag.innerText = newName;
-  set(ref(db, `users/${currentUser.uid}/name`), newName);
-});
-
-
-userIdTag.addEventListener('click', async () => {
-  const newId = prompt("Enter new ID (12 chars max):", currentUserId);
-  if (!newId) return;
-  if (newId !== "ADMINISTRATOR" && newId.length > 12) return alert("Invalid ID");
-
-  try {
-    // 获取所有用户数据一次
-    const usersSnap = await get(ref(db, 'users'));
-    const users = usersSnap.val() || {};
-
-    // 检查是否有重复
-    if (Object.entries(users).some(([uid,u]) => uid !== currentUser.uid && u.userId === newId)) {
-  alert("This ID is already taken by another user.");
-  return;
-}
-
-    // 没有重复，更新 Firebase 和本地
-    currentUserId = newId;
-    userIdTag.innerText = currentUserId;
-    await set(ref(db, `users/${currentUser.uid}/userId`), currentUserId);
-    localStorage.setItem('deviceId', currentUserId);
-
-    alert("ID updated successfully!");
-  } catch (err) {
-    console.error("Error checking/updating userId:", err);
-    alert("Failed to update ID. Try again later.");
-  }
-});
-
- 
-// ---------- Realtime & Forum ----------
+// ----------------- Render Forum -----------------
 function renderForum(){
   const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
   arr.sort((a,b)=>{
@@ -289,28 +207,23 @@ function renderForum(){
   }).join('');
 }
 
- // ---------- Admin check ----------
-function isAdmin() {
-  return currentUserId === "ADMINISTRATOR";
-}
-// ---------- Open Topic ----------
+// ----------------- Open Topic -----------------
 window.openTopic = function(topicId){
   currentTopicId = topicId;
   forumPage.classList.add('hidden'); 
   topicPage.classList.remove('hidden'); 
-  topicPage.style.opacity = 1; 
+  setTimeout(()=>topicPage.style.opacity=1,50);
   renderTopicPage(topicId);
 };
 
 backToForumBtn.addEventListener('click',()=>{
   topicPage.classList.add('hidden'); 
   forumPage.classList.remove('hidden'); 
-  forumPage.style.opacity=1; 
+  setTimeout(()=>forumPage.style.opacity=1,50);
   currentTopicId=null; 
   newPostContent.value=''; 
   editorStatus.innerText='';
 });
-
 
 // ---------- Render Topic & Posts ----------
 function renderTopicPage(topicId){
