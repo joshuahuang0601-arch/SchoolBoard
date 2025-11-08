@@ -393,6 +393,26 @@ deleteTopicBtn.addEventListener('click', ()=>{
   topicPage.classList.add('hidden'); 
   forumPage.classList.remove('hidden');
 });
+  // ---------- Create Topic ----------
+createTopicBtn.addEventListener("click", async ()=>{
+  const name = topicNameInput.value.trim();
+  const desc = topicDescInput.value.trim();
+
+  if(!name) return alert("Enter topic name");
+
+  const newTopicRef = push(ref(db, "topics"));
+  await set(newTopicRef, {
+    topicName: name,
+    description: desc,
+    authorUid: currentUser.uid,
+    timestamp: Date.now()
+  });
+
+  topicNameInput.value = "";
+  topicDescInput.value = "";
+  alert("Topic Created!");
+});
+
 </script>
 </body>
 </html>
