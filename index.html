@@ -168,13 +168,13 @@ set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: curren
 
 // Welcome
 welcome.addEventListener('click',()=>{
-  welcome.style.opacity=0;
-  setTimeout(()=>{
-    welcome.remove();
-    forumPage.classList.remove('hidden');
-    forumPage.style.opacity=1;
-  },400);
+  // 先显示 forumPage 再做渐变
+  forumPage.classList.remove('hidden');
+  setTimeout(()=>forumPage.style.opacity=1, 50); // 延迟保证 transition 生效
+  welcome.style.opacity = 0;
+  setTimeout(()=>welcome.remove(), 400);
 });
+
 
 // Realtime listener
 function initRealtime(){
