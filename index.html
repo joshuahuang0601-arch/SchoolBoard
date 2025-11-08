@@ -95,7 +95,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, set, get, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
 // Firebase Config
@@ -150,6 +150,16 @@ const userIdTag = document.getElementById('userIdTag');
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
 
+userTag.addEventListener('click', ()=>{
+  const newName = prompt("Enter your display name:", currentUserName);
+  if(newName && newName.trim()){
+    currentUserName = newName.trim();
+    localStorage.setItem('anonName', currentUserName);
+    userTag.innerText = currentUserName;
+    set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
+  }
+});
+
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
 function isAdmin() { return currentUserId === ADMIN_ID; }
@@ -169,9 +179,7 @@ if(!storedUid){
     currentUser = u.user;
     storedUid = currentUser.uid;
     localStorage.setItem('anonUid', storedUid);
-
     set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
-
     welcome.addEventListener('click', showForumPage);
     initRealtime();
   }).catch(console.error);
@@ -192,23 +200,37 @@ function initRealtime(){
 function renderForum(){
   const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
   arr.sort((a,b)=>{
-    const aFav=a.favorites&&a.favorites[currentUser.uid]?1:0;
-    const bFav=b.favorites&&b.favorites[currentUser.uid]?1:0;
+    const aFav=a.favorites && a.favorites[currentUser.uid]?1:0;
+    const bFav=b.favorites && b.favorites[currentUser.uid]?1:0;
     if(aFav!==bFav) return bFav-aFav;
     return (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0);
   });
   forumContainer.innerHTML=arr.map(t=>{
     const topPosts=t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
     const preview=topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
-    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
-      <div>
+    const favClass = t.favorites && t.favorites[currentUser.uid] ? 'text-yellow-400' : 'text-gray-400';
+    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between items-start cursor-pointer">
+      <div onclick="openTopic('${t.id}')">
         <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
         <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
         ${preview}
       </div>
+      <i onclick="toggleFavorite('${t.id}')" data-lucide="star" class="${favClass} w-5 h-5 mt-1"></i>
     </div>`;
   }).join('');
+  lucide.createIcons();
 }
+
+window.toggleFavorite = function(topicId){
+  const favRef = ref(db, `topics/${topicId}/favorites/${currentUser.uid}`);
+  get(favRef).then(snap=>{
+    if(snap.exists()){
+      remove(favRef);
+    } else {
+      set(favRef, true);
+    }
+  });
+};
 
 window.openTopic = function(topicId){
   currentTopicId = topicId;
@@ -240,189 +262,196 @@ function renderTopicPage(topicId){
   posts.forEach(p => { renderPostRecursive(p, postsContainer, topicId); });
 }
 
-function renderPostRecursive(post, parentElem, topicId) {
-  const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
-  const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
+function renderPostRecursive(post, parentElem, topicId){
+  const canDelete = post.authorUid===currentUser.uid || topicsCache[topicId].authorUid===currentUser.uid || isAdmin();
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
   div.innerHTML = `
-    <div class="flex justify-between items-start" id="postHeader-${post.id}">
+    <div class="flex justify-between items-start">
       <div>
-        <div class="font-medium text-gray-700">${escapeHtml(post.authorName || "Anonymous")}</div>
-        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp || 0)}</div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
-        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
+        <i data-lucide="thumbs-up" class="w-5 h-5"></i>
         <span class="text-sm">${likesCount}</span>
-        ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
+        ${canDelete?`<i data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>`:''}
       </div>
     </div>
-    <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
-    <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
-    <div id="replies-${post.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? 'expanded' : ''}"></div>
-    <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
+    <div class="mt-2 text-gray-700">${escapeHtml(post.content)}</div>
+    <span class="collapse-toggle ${post.replies?'':'hidden'}">Show Replies (${post.replies?Object.keys(post.replies).length:0})</span>
+    <div class="reply-container"></div>
+    <div class="mt-2 hidden flex gap-1 reply-box">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
       <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
     </div>
   `;
   parentElem.appendChild(div);
+  lucide.createIcons();
 
-  const repliesEl = div.querySelector(`#replies-${post.id}`);
-  const toggleEl = div.querySelector(`#toggle-${post.id}`);
+  const replyContainer = div.querySelector('.reply-container');
+  if(post.replies){
+    Object.entries(post.replies).forEach(([rid,rPost])=>{
+      renderPostRecursive({id:rid, ...rPost}, replyContainer, topicId);
+    });
+  }
+
+  // 点赞
+  const likeBtn = div.querySelector('i[data-lucide="thumbs-up"]');
+  likeBtn.addEventListener('click', e=>{
+    e.stopPropagation();
+    const likeRef = ref(db, `topics/${currentTopicId}/posts/${post.id}/likes/${currentUser.uid}`);
+    get(likeRef).then(snap=> snap.exists()? remove(likeRef): set(likeRef,true));
+  });
+
+  // 删除
+  const delBtn = div.querySelector('i[data-lucide="trash-2"]');
+  if(delBtn){
+    delBtn.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(confirm("Delete this post?")) remove(ref(db, `topics/${currentTopicId}/posts/${post.id}`));
+    });
+  }
+
+  // 回复框
+  const replyBox = div.querySelector('.reply-box');
+  const replyInput = replyBox.querySelector('input');
+  const sendBtn = replyBox.querySelector('button');
+  div.querySelector('.mt-2.text-gray-700').addEventListener('click', ()=>{
+    replyBox.classList.remove('hidden');
+    replyInput.focus();
+  });
+  sendBtn.addEventListener('click', ()=>{
+    const val = replyInput.value.trim();
+    if(!val) return;
+    push(ref(db, `topics/${currentTopicId}/posts/${post.id}/replies`), {
+      authorName: currentUserName,
+      authorUid: currentUser.uid,
+      content: val,
+      timestamp: Date.now()
+    });
+    replyInput.value='';
+    replyBox.classList.add('hidden');
+  });
+
+  // 折叠回复
+  const toggleBtn = div.querySelector('.collapse-toggle');
+  toggleBtn.addEventListener('click', e=>{
+    e.stopPropagation();
+    const expanded = replyContainer.classList.toggle('expanded');
+    toggleBtn.innerText = expanded ? `Hide Replies (${Object.keys(post.replies||{}).length})` : `Show Replies (${Object.keys(post.replies||{}).length})`;
+  });
+}
+
+
+  const postContentDiv = div.querySelector(`#postContent-${post.id}`);
   const replyBox = div.querySelector(`#replyBox-${post.id}`);
   const replyInput = replyBox.querySelector('input');
   const sendBtn = replyBox.querySelector('button');
-
-  div.querySelector(`#postContent-${post.id}`).addEventListener('click', () => {
+  postContentDiv.addEventListener('click', ()=>{
     replyBox.classList.remove('hidden');
     replyInput.focus();
   });
 
-  sendBtn.addEventListener('click', () => {
-    if (!replyInput.value.trim()) return;
-    submitReply(post.id, replyInput.value);
+  sendBtn.addEventListener('click', ()=>{
+    const val = replyInput.value.trim();
+    if(!val) return;
+    push(ref(db, `topics/${currentTopicId}/posts/${post.id}/replies`),{
+      authorName: currentUserName,
+      authorUid: currentUser.uid,
+      content: val,
+      timestamp: Date.now()
+    });
     replyInput.value = '';
     replyBox.classList.add('hidden');
   });
-
-  if(post.replies){
-    toggleEl.classList.remove('hidden');
-    toggleEl.addEventListener('click', () => {
-      const expanded = repliesEl.classList.toggle('expanded');
-      toggleEl.innerText = expanded ? 'Hide Replies' : `Show Replies (${Object.keys(post.replies).length})`;
-      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
-    });
-
-    Object.entries(post.replies).forEach(([rid, rp]) => {
-      renderReplyRecursive({...rp, id:rid}, repliesEl, topicId, post.id, 1);
-    });
-  }
-
-  lucide.createIcons();
 }
-
-function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 1) {
-  const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
-  const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
-  const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
-
-  const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
-  div.style.marginLeft = `${level * 1}rem`;
-  div.innerHTML = `
-    <div class="flex justify-between items-start">
-      <div>
-        <div class="font-medium text-gray-700">${escapeHtml(reply.authorName || "Anonymous")}</div>
-        <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp || 0)}</div>
-      </div>
-      <div class="flex gap-2 post-actions">
-        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
-        <span class="text-sm">${likesCount}</span>
-        ${canDelete ? `<i onclick="deleteReply('${parentPostId}','${reply.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
-      </div>
-    </div>
-    <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
-    <div id="replies-${reply.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${reply.id}`) === 'true' ? 'expanded' : ''}"></div>
-  `;
-  parentElem.appendChild(div);
-
-  const repliesEl = div.querySelector(`#replies-${reply.id}`);
-
-  if (reply.replies) {
-    Object.entries(reply.replies).forEach(([rid, rp]) => {
-      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
-    });
-  }
-
-  lucide.createIcons();
-}
-
-window.submitReply=function(postId,content){
-  if(!content.trim()) return;
-  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
-    authorName: currentUserName,
-    authorUid: currentUser.uid,
-    content: content,
-    timestamp: Date.now()
-  }).then(() => {
-    setTimeout(() => {
-      const repliesEl = document.getElementById(`replies-${postId}`);
-      if(repliesEl){
-        repliesEl.classList.add('expanded');
-        repliesEl.scrollTop = repliesEl.scrollHeight;
-      }
-    }, 100);
-  });
-};
-
 postBtn.addEventListener('click', ()=>{
-  const val = newPostContent.value.trim(); 
-  if(!val) return alert("Enter post content"); 
-  push(ref(db,`topics/${currentTopicId}/posts`),{
+  const content = newPostContent.value.trim();
+  if(!content) return;
+  const postRef = push(ref(db, `topics/${currentTopicId}/posts`));
+  set(postRef,{
     authorName: currentUserName,
     authorUid: currentUser.uid,
-    content: val,
+    content,
     timestamp: Date.now()
-  }); 
-  newPostContent.value = ''; 
-  editorStatus.innerText = 'Posted'; 
-  setTimeout(()=>editorStatus.innerText='', 1000);
+  });
+  newPostContent.value = '';
+  editorStatus.innerText = 'Posted!';
+  setTimeout(()=> editorStatus.innerText='',2000);
 });
-
-window.likePost = function(postId){
-  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true);
-};
-window.likeReply = function(postId, replyId){
-  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true);
-};
-
-window.deletePost = function(postId){
-  const post = topicsCache[currentTopicId]?.posts?.[postId];
-  if(!post) return;
-  const canDelete = post.authorUid === currentUser.uid || topicsCache[currentTopicId].authorUid === currentUser.uid || isAdmin();
-  if(!canDelete) return alert("You do not have permission to delete this post.");
-  if(!confirm("Delete this post?")) return;
-  remove(ref(db, `topics/${currentTopicId}/posts/${postId}`));
-};
-window.deleteReply = async function(postId, replyId){
-  const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
-  const snap = await get(replyRef);
-  if(!snap.exists()) return;
-  if(!confirm("Delete this reply?")) return;
-  remove(replyRef);
-};
-
 deleteTopicBtn.addEventListener('click', ()=>{
-  const topic = topicsCache[currentTopicId];
-  if(!topic) return;
-  if(!(topic.authorUid === currentUser.uid || isAdmin())) return alert("You do not have permission to delete this topic.");
-  if(!confirm("Delete entire topic?")) return;
-  remove(ref(db, `topics/${currentTopicId}`));
-  currentTopicId = null; 
-  topicPage.classList.add('hidden'); 
-  forumPage.classList.remove('hidden');
+  if(!currentTopicId) return;
+  if(confirm("Delete this topic?")){
+    remove(ref(db, `topics/${currentTopicId}`));
+    topicPage.classList.add('hidden'); 
+    forumPage.classList.remove('hidden'); 
+    currentTopicId = null;
+  }
 });
-
-createTopicBtn.addEventListener("click", async ()=>{
-  if(!currentUser) return alert("Still signing in... try again in a sec");
+createTopicBtn.addEventListener('click', ()=>{
   const name = topicNameInput.value.trim();
   const desc = topicDescInput.value.trim();
-  if(!name) return alert("Enter topic name");
-  try {
-    const newTopicRef = push(ref(db, "topics"));
-    await set(newTopicRef, { topicName: name, description: desc, authorUid: currentUser.uid, timestamp: Date.now() });
-    topicNameInput.value = "";
-    topicDescInput.value = "";
-    alert("Topic Created!");
-  } catch(err) {
-    console.error(err);
-    alert("Failed to create topic, try again later");
-  }
+  if(!name) return alert("Topic name cannot be empty");
+  
+  const newTopicRef = push(ref(db, 'topics'));
+  set(newTopicRef, {
+    topicName: name,
+    description: desc,
+    authorName: currentUserName,
+    authorUid: currentUser.uid,
+    timestamp: Date.now()
+  });
+
+  topicNameInput.value = '';
+  topicDescInput.value = '';
 });
+
+saveDraftBtn.addEventListener('click', ()=>{
+  const name = topicNameInput.value.trim();
+  const desc = topicDescInput.value.trim();
+  if(!name) return alert("Cannot save empty draft");
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts')||'[]');
+  drafts.push({topicName: name, description: desc, timestamp: Date.now()});
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  renderDrafts();
+  topicNameInput.value = '';
+  topicDescInput.value = '';
+});
+
+function renderDrafts(){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts')||'[]');
+  draftsContainer.innerHTML = drafts.map((d,i)=>
+    `<div class="bg-gray-100 p-2 rounded mb-1 flex justify-between items-center cursor-pointer">
+       <div onclick="loadDraft(${i})">
+         <div class="font-medium">${escapeHtml(d.topicName)}</div>
+         <div class="text-gray-500 text-sm">${escapeHtml(d.description)}</div>
+       </div>
+       <i onclick="deleteDraft(${i});event.stopPropagation()" data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
+     </div>`
+  ).join('');
+  lucide.createIcons();
+}
+
+window.loadDraft = function(index){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts')||'[]');
+  if(!drafts[index]) return;
+  topicNameInput.value = drafts[index].topicName;
+  topicDescInput.value = drafts[index].description;
+};
+
+window.deleteDraft = function(index){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts')||'[]');
+  drafts.splice(index,1);
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  renderDrafts();
+}
+
+// 初始化渲染一次
+renderDrafts();
+
 </script>
 </body>
-</html>为什么没法点赞 无法点击名字id进行更改
+</html>
