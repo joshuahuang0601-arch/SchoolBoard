@@ -188,11 +188,10 @@ function initRealtime(){
   });
 }
 
-// ---- Render Forum with Favorite Star ----
 function renderForum(){
-  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  const arr = Object.entries(topicsCache).map(([id,t])=>({id,...t}));
 
-  // 先按收藏，再按帖子数量排序
+  // 按收藏优先，再按帖子数量排序
   arr.sort((a,b)=>{
     const aFav = a.favorites && a.favorites[currentUser.uid] ? 1:0;
     const bFav = b.favorites && b.favorites[currentUser.uid] ? 1:0;
@@ -201,8 +200,17 @@ function renderForum(){
   });
 
   forumContainer.innerHTML = arr.map(t=>{
-    const topPosts = t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
-    const preview = topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
+    const topPosts = t.posts?Object.entries(t.posts)
+      .map(([pid,p])=>({id:pid,...p}))
+      .sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0))
+      .slice(0,2):[];
+
+    const preview = topPosts.map(p=>`
+      <div class="text-sm text-gray-600">
+        ${escapeHtml(p.content)} 
+        <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span>
+      </div>`).join('');
+
     const favClass = t.favorites && t.favorites[currentUser.uid] ? 'text-yellow-400' : 'text-gray-400';
 
     return `
@@ -217,10 +225,9 @@ function renderForum(){
       </div>
     </div>`;
   }).join('');
+
   lucide.createIcons();
 }
-
-// ---- Toggle Favorite ----
 window.toggleFavorite = async function(topicId){
   const favRef = ref(db, `topics/${topicId}/favorites/${currentUser.uid}`);
   const snap = await get(favRef);
