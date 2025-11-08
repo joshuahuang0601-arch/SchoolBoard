@@ -308,6 +308,11 @@ function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+const likeIcon = document.createElement('i');
+likeIcon.setAttribute('data-lucide','thumbs-up');
+likeIcon.className = `${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5 cursor-pointer`;
+likeIcon.addEventListener('click', ()=>toggleLikePost(post.id));
+actionsEl.prepend(likeIcon);
 
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
@@ -393,7 +398,7 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   parentElem.appendChild(div);
 
   const repliesEl = div.querySelector(`#replies-${reply.id}`);
-
+likeIcon.addEventListener('click', ()=>toggleLikeReply(parentPostId, reply.id));
   if (reply.replies) {
     Object.entries(reply.replies).forEach(([rid, rp]) => {
       renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
@@ -489,4 +494,4 @@ createTopicBtn.addEventListener("click", async ()=>{
 });
 </script>
 </body>
-</html>为什么点赞图标没法点赞？增加topic的收藏图标（收藏之后置顶）
+</html>
