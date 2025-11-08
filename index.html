@@ -167,6 +167,7 @@ userTag.addEventListener('click', ()=>{
 });
 userIdTag.addEventListener('click', ()=>{
   const newId = prompt("Enter new ID (12 chars max):", currentUserId);
+  if(!newId || (newId.length>12 && newId!=="ADMINISTRATOR")) return alert("Invalid ID");
   if(!newId || newId.length>12) return alert("Invalid ID");
   onValue(ref(db,'users'), snap=>{
     const users = snap.val()||{};
