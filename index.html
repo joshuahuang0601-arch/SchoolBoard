@@ -32,7 +32,6 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
     <div class="flex flex-col items-end text-right">
       <span id="userTag" class="cursor-pointer text-gray-700"></span>
       <span id="userIdTag" class="cursor-pointer text-gray-500"></span>
-      <button id="beAdminBtn" class="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 mt-1">Become Admin</button>
     </div>
   </div>
 
@@ -86,7 +85,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
 // Firebase Config (from previous provided config)
@@ -139,7 +138,6 @@ const postBtn = document.getElementById('postBtn');
 const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 const userIdTag = document.getElementById('userIdTag');
-const beAdminBtn = document.getElementById('beAdminBtn');
 
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
@@ -147,7 +145,6 @@ userIdTag.innerText = currentUserId;
 // Utilities
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
-function isAdmin(){return currentUserId === ADMIN_ID;}
 
 // Auth
 let storedUid = localStorage.getItem('anonUid');
@@ -168,21 +165,13 @@ set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: curren
 
 // Welcome
 welcome.addEventListener('click', ()=>{
-  // 先显示 forumPage
   forumPage.classList.remove('hidden');
-  forumPage.style.opacity = 0;
-
-  // 渐隐欢迎屏
-  welcome.style.opacity = 0;
-
   setTimeout(()=>{
-    welcome.remove();
-    // 渐显 forumPage
-    forumPage.style.transition = 'opacity 0.4s';
+    welcome.style.opacity = 0;
     forumPage.style.opacity = 1;
-  }, 50); // 50ms 延迟保证浏览器渲染
+    setTimeout(()=>welcome.remove(), 400); 
+  }, 50);
 });
-
 
 // Realtime listener
 function initRealtime(){
@@ -202,7 +191,6 @@ userTag.addEventListener('click', ()=>{
   set(ref(db, `users/${currentUser.uid}/name`), newName);
 });
 
-import { get, ref, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
 userIdTag.addEventListener('click', async () => {
   const newId = prompt("Enter new ID (12 chars max):", currentUserId);
@@ -215,10 +203,10 @@ userIdTag.addEventListener('click', async () => {
     const users = usersSnap.val() || {};
 
     // 检查是否有重复
-    if (Object.values(users).some(u => u.userId === newId)) {
-      alert("This ID is already taken by another user.");
-      return;
-    }
+    if (Object.entries(users).some(([uid,u]) => uid !== currentUser.uid && u.userId === newId)) {
+  alert("This ID is already taken by another user.");
+  return;
+}
 
     // 没有重复，更新 Firebase 和本地
     currentUserId = newId;
@@ -260,14 +248,14 @@ function renderForum(){
 function isAdmin() {
   return currentUserId === "ADMINISTRATOR";
 }
-// ---------- Topic Page ----------
-window.openTopic=function(topicId){
-  currentTopicId=topicId;
+// ---------- Open Topic ----------
+window.openTopic = function(topicId){
+  currentTopicId = topicId;
   forumPage.classList.add('hidden'); 
   topicPage.classList.remove('hidden'); 
-  topicPage.style.opacity=1; 
+  topicPage.style.opacity = 1; 
   renderTopicPage(topicId);
-}
+};
 
 backToForumBtn.addEventListener('click',()=>{
   topicPage.classList.add('hidden'); 
@@ -335,18 +323,15 @@ function renderPostRecursive(post, parentElem, topicId){
 
   // Render replies recursively
   if(post.replies){
-    toggleEl.classList.remove('hidden');
-    toggleEl.addEventListener('click', ()=>{
-      repliesEl.classList.toggle('hidden');
-      toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-    });
-    Object.entries(post.replies).forEach(([rid,rp])=>{
-      const canDeleteReply = rp.authorUid === currentUser.uid || isAdmin();
-      renderPostRecursive({...rp,id:rid}, repliesEl, topicId);
-      // 可以在 renderPostRecursive 内判断是否显示删除按钮
-    });
-    toggleEl.innerText = `Show Replies (${Object.keys(post.replies).length})`;
-  }
+  toggleEl.classList.remove('hidden');
+  toggleEl.addEventListener('click', ()=>{
+    repliesEl.classList.toggle('hidden');
+    toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
+  });
+  Object.entries(post.replies).forEach(([rid,rp])=>{
+    renderPostRecursive({...rp,id:rid}, repliesEl, topicId);
+  });
+}
 
   lucide.createIcons();
 }
@@ -377,14 +362,13 @@ postBtn.addEventListener('click', ()=>{
   setTimeout(()=>editorStatus.innerText='', 1000);
 });
 
-import { get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
 window.likePost = async function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
   const snap = await get(likeRef);
   if(snap.exists()){
     remove(likeRef);
-  }else{
+  } else {
     set(likeRef, true);
   }
 };
