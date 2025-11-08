@@ -242,11 +242,10 @@ function renderTopicPage(topicId){
 
 function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
-  const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
   const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 reply';
   div.innerHTML = `
     <div class="flex justify-between items-start" id="postHeader-${post.id}">
       <div>
@@ -254,13 +253,12 @@ function renderPostRecursive(post, parentElem, topicId) {
         <div class="text-gray-400 text-sm">${timeAgo(post.timestamp || 0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
-        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
-        <span class="text-sm">${likesCount}</span>
-        ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
+        <i data-lucide="thumbs-up" class="text-gray-400 w-5 h-5"></i>
+        <span class="text-sm likes-count">${likesCount}</span>
+        ${canDelete ? `<i data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
     <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
-    <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
     <div id="replies-${post.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? 'expanded' : ''}"></div>
     <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
@@ -269,48 +267,61 @@ function renderPostRecursive(post, parentElem, topicId) {
   `;
   parentElem.appendChild(div);
 
-  const repliesEl = div.querySelector(`#replies-${post.id}`);
-  const toggleEl = div.querySelector(`#toggle-${post.id}`);
+  // 渲染图标
+  lucide.createIcons();
+
+  // 绑定点赞事件
+  const thumbsUp = div.querySelector('i[data-lucide="thumbs-up"]');
+  if(post.likes && post.likes[currentUser.uid]) thumbsUp.classList.replace('text-gray-400','text-blue-600');
+  thumbsUp.addEventListener('click', e => {
+    e.stopPropagation();
+    const likeRef = ref(db, `topics/${currentTopicId}/posts/${post.id}/likes/${currentUser.uid}`);
+    likeRef.transaction(current => current ? null : true);
+  });
+
+  // 绑定删除事件
+  const trash = div.querySelector('i[data-lucide="trash-2"]');
+  if(trash){
+    trash.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(!confirm("Delete this post?")) return;
+      remove(ref(db, `topics/${currentTopicId}/posts/${post.id}`));
+    });
+  }
+
+  // 点击内容显示回复框
+  const postContentEl = div.querySelector(`#postContent-${post.id}`);
   const replyBox = div.querySelector(`#replyBox-${post.id}`);
   const replyInput = replyBox.querySelector('input');
   const sendBtn = replyBox.querySelector('button');
-
-  div.querySelector(`#postContent-${post.id}`).addEventListener('click', () => {
+  postContentEl.addEventListener('click', () => {
     replyBox.classList.remove('hidden');
     replyInput.focus();
   });
-
-  sendBtn.addEventListener('click', () => {
-    if (!replyInput.value.trim()) return;
+  sendBtn.addEventListener('click', ()=>{
+    if(!replyInput.value.trim()) return;
     submitReply(post.id, replyInput.value);
     replyInput.value = '';
     replyBox.classList.add('hidden');
   });
 
+  // 渲染回复
+  const repliesEl = div.querySelector(`#replies-${post.id}`);
   if(post.replies){
-    toggleEl.classList.remove('hidden');
-    toggleEl.addEventListener('click', () => {
-      const expanded = repliesEl.classList.toggle('expanded');
-      toggleEl.innerText = expanded ? 'Hide Replies' : `Show Replies (${Object.keys(post.replies).length})`;
-      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
-    });
-
-    Object.entries(post.replies).forEach(([rid, rp]) => {
-      renderReplyRecursive({...rp, id:rid}, repliesEl, topicId, post.id, 1);
+    Object.entries(post.replies).forEach(([rid,rp])=>{
+      renderReplyRecursive({...rp,id:rid}, repliesEl, topicId, post.id, 1);
     });
   }
-
-  lucide.createIcons();
 }
 
-function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 1) {
+// 回复的点赞同理，注意事件绑定在 createIcons 后
+function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level=1){
   const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
-  const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
   const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
 
   const div = document.createElement('div');
-  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
-  div.style.marginLeft = `${level * 1}rem`;
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 reply';
+  div.style.marginLeft = `${level}rem`;
   div.innerHTML = `
     <div class="flex justify-between items-start">
       <div>
@@ -318,9 +329,9 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
         <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp || 0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
-        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
-        <span class="text-sm">${likesCount}</span>
-        ${canDelete ? `<i onclick="deleteReply('${parentPostId}','${reply.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
+        <i data-lucide="thumbs-up" class="text-gray-400 w-5 h-5"></i>
+        <span class="text-sm likes-count">${likesCount}</span>
+        ${canDelete ? `<i data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
     <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
@@ -328,16 +339,34 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   `;
   parentElem.appendChild(div);
 
-  const repliesEl = div.querySelector(`#replies-${reply.id}`);
+  lucide.createIcons();
 
-  if (reply.replies) {
-    Object.entries(reply.replies).forEach(([rid, rp]) => {
-      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
+  const thumbsUp = div.querySelector('i[data-lucide="thumbs-up"]');
+  if(reply.likes && reply.likes[currentUser.uid]) thumbsUp.classList.replace('text-gray-400','text-blue-600');
+  thumbsUp.addEventListener('click', e=>{
+    e.stopPropagation();
+    const likeRef = ref(db, `topics/${currentTopicId}/posts/${parentPostId}/replies/${reply.id}/likes/${currentUser.uid}`);
+    likeRef.transaction(current => current ? null : true);
+  });
+
+  const trash = div.querySelector('i[data-lucide="trash-2"]');
+  if(trash){
+    trash.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(!confirm("Delete this reply?")) return;
+      remove(ref(db, `topics/${currentTopicId}/posts/${parentPostId}/replies/${reply.id}`));
     });
   }
 
-  lucide.createIcons();
+  // 递归渲染子回复
+  const repliesEl = div.querySelector(`#replies-${reply.id}`);
+  if(reply.replies){
+    Object.entries(reply.replies).forEach(([rid,rp])=>{
+      renderReplyRecursive({...rp,id:rid}, repliesEl, topicId, parentPostId, level+1);
+    });
+  }
 }
+
 
 window.submitReply=function(postId,content){
   if(!content.trim()) return;
