@@ -15,6 +15,16 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
 .collapse-toggle { font-size:0.8rem; color:#555; cursor:pointer; margin-left:0.5rem; }
 .user-info { font-size: 0.8rem; color:#555; }
 .post-actions i { cursor: pointer; }
+
+/* 回复折叠动画 */
+.reply-container {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.reply-container.expanded {
+  max-height: 2000px; /* 足够大以容纳所有子回复 */
+}
 </style>
 </head>
 <body class="min-h-screen">
@@ -103,7 +113,6 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// ----------------- Global Variables -----------------
 let currentUser = null;
 let currentUserName = localStorage.getItem('anonName') || "User"+Math.floor(Math.random()*10000);
 localStorage.setItem('anonName', currentUserName);
@@ -118,7 +127,6 @@ const ADMIN_ID = "ADMINISTRATOR";
 let topicsCache = {};
 let currentTopicId = null;
 
-// ---------- UI Elements ----------
 const welcome = document.getElementById('welcome-screen');
 const forumPage = document.getElementById('forumPage');
 const topicPage = document.getElementById('topicPage');
@@ -142,12 +150,10 @@ const userIdTag = document.getElementById('userIdTag');
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
 
-// ----------------- Utilities -----------------
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
 function isAdmin() { return currentUserId === ADMIN_ID; }
 
-// ----------------- Anonymous Login & Welcome -----------------
 function showForumPage() {
   forumPage.classList.remove('hidden');
   setTimeout(()=>{
@@ -164,7 +170,6 @@ if(!storedUid){
     storedUid = currentUser.uid;
     localStorage.setItem('anonUid', storedUid);
 
-    // Upload user info
     set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
 
     welcome.addEventListener('click', showForumPage);
@@ -176,7 +181,6 @@ if(!storedUid){
   initRealtime();
 }
 
-// ----------------- Realtime Listener -----------------
 function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
     topicsCache = snap.val()||{};
@@ -185,7 +189,6 @@ function initRealtime(){
   });
 }
 
-// ----------------- Render Forum -----------------
 function renderForum(){
   const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
   arr.sort((a,b)=>{
@@ -207,7 +210,6 @@ function renderForum(){
   }).join('');
 }
 
-// ----------------- Open Topic -----------------
 window.openTopic = function(topicId){
   currentTopicId = topicId;
   forumPage.classList.add('hidden'); 
@@ -225,7 +227,6 @@ backToForumBtn.addEventListener('click',()=>{
   editorStatus.innerText='';
 });
 
-// ---------- Render Topic & Posts ----------
 function renderTopicPage(topicId){
   const topic = topicsCache[topicId]; 
   if(!topic) return;
@@ -238,7 +239,7 @@ function renderTopicPage(topicId){
   postsContainer.innerHTML = '';
   posts.forEach(p => { renderPostRecursive(p, postsContainer, topicId); });
 }
-// ---------- Recursive Post Rendering ----------
+
 function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
@@ -260,7 +261,7 @@ function renderPostRecursive(post, parentElem, topicId) {
     </div>
     <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
     <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
-    <div id="replies-${post.id}" class="mt-2 ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? '' : 'hidden'}"></div>
+    <div id="replies-${post.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? 'expanded' : ''}"></div>
     <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
       <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
@@ -268,20 +269,17 @@ function renderPostRecursive(post, parentElem, topicId) {
   `;
   parentElem.appendChild(div);
 
-  const postContentEl = div.querySelector(`#postContent-${post.id}`);
   const repliesEl = div.querySelector(`#replies-${post.id}`);
   const toggleEl = div.querySelector(`#toggle-${post.id}`);
   const replyBox = div.querySelector(`#replyBox-${post.id}`);
   const replyInput = replyBox.querySelector('input');
   const sendBtn = replyBox.querySelector('button');
 
-  // 点击内容显示 reply 输入框
-  postContentEl.addEventListener('click', () => {
+  div.querySelector(`#postContent-${post.id}`).addEventListener('click', () => {
     replyBox.classList.remove('hidden');
     replyInput.focus();
   });
 
-  // 发送按钮点击
   sendBtn.addEventListener('click', () => {
     if (!replyInput.value.trim()) return;
     submitReply(post.id, replyInput.value);
@@ -289,26 +287,22 @@ function renderPostRecursive(post, parentElem, topicId) {
     replyBox.classList.add('hidden');
   });
 
-  // 回复展开/折叠
-  if (post.replies) {
+  if(post.replies){
     toggleEl.classList.remove('hidden');
     toggleEl.addEventListener('click', () => {
-      const expanded = !repliesEl.classList.contains('hidden');
-      repliesEl.classList.toggle('hidden');
-      toggleEl.innerText = expanded ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-      localStorage.setItem(`repliesExpanded-${post.id}`, !expanded);
+      const expanded = repliesEl.classList.toggle('expanded');
+      toggleEl.innerText = expanded ? 'Hide Replies' : `Show Replies (${Object.keys(post.replies).length})`;
+      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
     });
 
-    // 递归渲染子回复
     Object.entries(post.replies).forEach(([rid, rp]) => {
-      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, post.id, 1);
+      renderReplyRecursive({...rp, id:rid}, repliesEl, topicId, post.id, 1);
     });
   }
 
-  lucide.createIcons(); //渲染图标一次
+  lucide.createIcons();
 }
 
-// ---------- Recursive Reply Rendering ----------
 function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 1) {
   const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
@@ -316,7 +310,7 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
 
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
-  div.style.marginLeft = `${level * 1}rem`; // 控制缩进
+  div.style.marginLeft = `${level * 1}rem`;
   div.innerHTML = `
     <div class="flex justify-between items-start">
       <div>
@@ -330,13 +324,12 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
       </div>
     </div>
     <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
-    <div id="replies-${reply.id}" class="mt-2 ${localStorage.getItem(`repliesExpanded-${reply.id}`) === 'true' ? '' : 'hidden'}"></div>
+    <div id="replies-${reply.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${reply.id}`) === 'true' ? 'expanded' : ''}"></div>
   `;
   parentElem.appendChild(div);
 
   const repliesEl = div.querySelector(`#replies-${reply.id}`);
 
-  // 递归渲染子回复
   if (reply.replies) {
     Object.entries(reply.replies).forEach(([rid, rp]) => {
       renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
@@ -346,41 +339,6 @@ function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 
   lucide.createIcons();
 }
 
-
-// ---------- Like Reply ----------
-window.likeReply = function(postId, replyId){
-  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true)
-    .then(() => console.log("Reply like toggled"))
-    .catch(err => console.error("Error toggling like:", err));
-};
-
-// ---------- Delete Reply ----------
-window.deleteReply = async function(postId, replyId){
-  const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
-  const snap = await get(replyRef);
-  if(!snap.exists()) return;
-  if(!confirm("Delete this reply?")) return;
-  remove(replyRef);
-}
-
-  // Render replies recursively using dedicated function
-if(post.replies){
-  toggleEl.classList.remove('hidden');
-  toggleEl.addEventListener('click', ()=>{
-    repliesEl.classList.toggle('hidden');
-    toggleEl.innerText = repliesEl.classList.contains('hidden') ? `Show Replies (${Object.keys(post.replies).length})` : 'Hide Replies';
-  });
-  Object.entries(post.replies).forEach(([rid,rp])=>{
-    renderReplyRecursive({...rp,id:rid}, repliesEl, topicId, post.id);
-  });
-}
-
-
-  lucide.createIcons();
-}
-
-// ---------- Submit Reply ----------
 window.submitReply=function(postId,content){
   if(!content.trim()) return;
   push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
@@ -388,10 +346,17 @@ window.submitReply=function(postId,content){
     authorUid: currentUser.uid,
     content: content,
     timestamp: Date.now()
+  }).then(() => {
+    setTimeout(() => {
+      const repliesEl = document.getElementById(`replies-${postId}`);
+      if(repliesEl){
+        repliesEl.classList.add('expanded');
+        repliesEl.scrollTop = repliesEl.scrollHeight;
+      }
+    }, 100);
   });
-}
+};
 
-// ---------- Post / Like / Delete ----------
 postBtn.addEventListener('click', ()=>{
   const val = newPostContent.value.trim(); 
   if(!val) return alert("Enter post content"); 
@@ -406,12 +371,13 @@ postBtn.addEventListener('click', ()=>{
   setTimeout(()=>editorStatus.innerText='', 1000);
 });
 
-
 window.likePost = function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true)
-    .then(() => console.log("Post like toggled"))
-    .catch(err => console.error("Error toggling like:", err));
+  likeRef.transaction(current => current ? null : true);
+};
+window.likeReply = function(postId, replyId){
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+  likeRef.transaction(current => current ? null : true);
 };
 
 window.deletePost = function(postId){
@@ -421,9 +387,15 @@ window.deletePost = function(postId){
   if(!canDelete) return alert("You do not have permission to delete this post.");
   if(!confirm("Delete this post?")) return;
   remove(ref(db, `topics/${currentTopicId}/posts/${postId}`));
-}
+};
+window.deleteReply = async function(postId, replyId){
+  const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
+  const snap = await get(replyRef);
+  if(!snap.exists()) return;
+  if(!confirm("Delete this reply?")) return;
+  remove(replyRef);
+};
 
-// ---------- Delete Topic ----------
 deleteTopicBtn.addEventListener('click', ()=>{
   const topic = topicsCache[currentTopicId];
   if(!topic) return;
@@ -434,23 +406,15 @@ deleteTopicBtn.addEventListener('click', ()=>{
   topicPage.classList.add('hidden'); 
   forumPage.classList.remove('hidden');
 });
-  createTopicBtn.addEventListener("click", async ()=>{
-  if(!currentUser) return alert("Still signing in... try again in a sec");
 
+createTopicBtn.addEventListener("click", async ()=>{
+  if(!currentUser) return alert("Still signing in... try again in a sec");
   const name = topicNameInput.value.trim();
   const desc = topicDescInput.value.trim();
-
   if(!name) return alert("Enter topic name");
-
   try {
     const newTopicRef = push(ref(db, "topics"));
-    await set(newTopicRef, {
-      topicName: name,
-      description: desc,
-      authorUid: currentUser.uid,
-      timestamp: Date.now()
-    });
-
+    await set(newTopicRef, { topicName: name, description: desc, authorUid: currentUser.uid, timestamp: Date.now() });
     topicNameInput.value = "";
     topicDescInput.value = "";
     alert("Topic Created!");
@@ -459,8 +423,6 @@ deleteTopicBtn.addEventListener('click', ()=>{
     alert("Failed to create topic, try again later");
   }
 });
-
-
 </script>
 </body>
 </html>
