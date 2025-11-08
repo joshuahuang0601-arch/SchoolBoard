@@ -57,7 +57,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
   </div>
 
   <!-- Drafts Panel -->
-  <div id="draftsPanel" class="bg-gray-50 p-4 rounded-lg mb-6">
+  <div id="draftsPanel" class="bg-gray-50 p-4 rounded-lg mb-6" style="display:none;">
     <h3 class="font-bold text-gray-700 mb-2">Your Drafts</h3>
     <div id="draftsContainer"></div>
   </div>
@@ -141,14 +141,13 @@ const topicDescInput = document.getElementById('topicDesc');
 const createTopicBtn = document.getElementById('createTopicBtn');
 const saveDraftBtn = document.getElementById('saveDraftBtn');
 const draftsContainer = document.getElementById('draftsContainer');
+const draftsPanel = document.getElementById('draftsPanel');
 const newPostContent = document.getElementById('newPostContent');
 const postBtn = document.getElementById('postBtn');
 const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 const userIdTag = document.getElementById('userIdTag');
-const saveDraftBtn = document.getElementById('saveDraftBtn');
-const draftsContainer = document.getElementById('draftsContainer');
-const draftsPanel = document.getElementById('draftsPanel');
+
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
   
@@ -161,6 +160,7 @@ userTag.addEventListener('click', ()=>{
     set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
   }
 });
+
 let storedUid = localStorage.getItem('anonUid');
 if(!storedUid){
   signInAnonymously(auth).then(u=>{
@@ -185,18 +185,18 @@ function initRealtime(){
     renderForum();
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
+  loadDrafts();
 }
+
 userIdTag.addEventListener('click', async ()=>{
   const newId = prompt("Enter new 12-character ID (letters + digits only):", currentUserId);
   if(!newId) return;
 
-  // 验证长度和字符
   const valid = /^[A-Za-z0-9]{12}$/.test(newId);
   if(!valid){
     return alert("ID must be exactly 12 characters and contain only letters and digits.");
   }
 
-  // 检查是否已存在
   const usersRef = ref(db, 'users');
   try{
     const snapshot = await get(usersRef);
@@ -206,10 +206,8 @@ userIdTag.addEventListener('click', async ()=>{
       return alert("This ID is already taken. Please choose another one.");
     }
 
-    // 更新 Firebase
     await set(ref(db, `users/${currentUser.uid}/userId`), newId);
 
-    // 更新本地存储和显示
     currentUserId = newId;
     localStorage.setItem('deviceId', newId);
     userIdTag.innerText = newId;
@@ -232,8 +230,6 @@ function showForumPage() {
     setTimeout(()=>welcome.remove(), 400);
   },50);
 }
-
-
 
 function renderForum(){
   const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
@@ -417,13 +413,25 @@ postBtn.addEventListener('click', ()=>{
   setTimeout(()=>editorStatus.innerText='', 1000);
 });
 
-window.likePost = function(postId){
+// ✅ 修复后的点赞功能
+window.likePost = async function(postId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true);
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    await remove(likeRef);
+  } else {
+    await set(likeRef, true);
+  }
 };
-window.likeReply = function(postId, replyId){
+
+window.likeReply = async function(postId, replyId){
   const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
-  likeRef.transaction(current => current ? null : true);
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    await remove(likeRef);
+  } else {
+    await set(likeRef, true);
+  }
 };
 
 window.deletePost = function(postId){
@@ -434,6 +442,7 @@ window.deletePost = function(postId){
   if(!confirm("Delete this post?")) return;
   remove(ref(db, `topics/${currentTopicId}/posts/${postId}`));
 };
+
 window.deleteReply = async function(postId, replyId){
   const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
   const snap = await get(replyRef);
@@ -469,6 +478,59 @@ createTopicBtn.addEventListener("click", async ()=>{
     alert("Failed to create topic, try again later");
   }
 });
+
+// ✅ 草稿功能实现
+saveDraftBtn.addEventListener('click', ()=>{
+  const name = topicNameInput.value.trim();
+  const desc = topicDescInput.value.trim();
+  if(!name && !desc) return alert("Nothing to save");
+  
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  drafts.push({ name, desc, timestamp: Date.now() });
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  
+  topicNameInput.value = "";
+  topicDescInput.value = "";
+  alert("Draft saved!");
+  loadDrafts();
+});
+
+function loadDrafts(){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  if(drafts.length === 0){
+    draftsPanel.style.display = 'none';
+    return;
+  }
+  draftsPanel.style.display = 'block';
+  draftsContainer.innerHTML = drafts.map((d, idx)=>`
+    <div class="bg-white p-3 rounded shadow mb-2 flex justify-between items-start">
+      <div class="flex-1">
+        <div class="font-medium">${escapeHtml(d.name)}</div>
+        <div class="text-sm text-gray-600">${escapeHtml(d.desc)}</div>
+        <div class="text-xs text-gray-400">${timeAgo(d.timestamp)}</div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="useDraft(${idx})" class="text-sm bg-indigo-500 text-white px-2 py-1 rounded hover:bg-indigo-600">Use</button>
+        <button onclick="deleteDraft(${idx})" class="text-sm bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.useDraft = function(idx){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  if(!drafts[idx]) return;
+  topicNameInput.value = drafts[idx].name;
+  topicDescInput.value = drafts[idx].desc;
+  deleteDraft(idx);
+};
+
+window.deleteDraft = function(idx){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  drafts.splice(idx, 1);
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  loadDrafts();
+};
 </script>
 </body>
 </html>
