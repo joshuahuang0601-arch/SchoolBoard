@@ -23,17 +23,7 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
   transition: max-height 0.3s ease;
 }
 .reply-container.expanded {
-  max-height: 2000px;
-}
-
-/* 收藏置顶动画 */
-@keyframes fade-highlight {
-  0% { background-color: #fef3c7; }
-  50% { background-color: #fff; }
-  100% { background-color: #fff; }
-}
-.animate-fade {
-  animation: fade-highlight 0.5s ease;
+  max-height: 2000px; /* 足够大以容纳所有子回复 */
 }
 </style>
 </head>
@@ -65,230 +55,6 @@ body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); 
       <button id="saveDraftBtn" class="bg-gray-300 px-5 py-2 rounded-lg hover:bg-gray-400">Save Draft</button>
     </div>
   </div>
-
-  <!-- Topics List -->
-  <div id="forumContainer" class="space-y-4"></div>
-</div>
-
-<!-- Topic Page -->
-<div id="topicPage" class="hidden fade opacity-0 max-w-6xl mx-auto px-4 py-8">
-  <div class="flex justify-between items-center mb-6">
-    <button id="backToForumBtn" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 flex items-center gap-2">
-      <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Forum
-    </button>
-    <div class="flex items-center gap-2">
-      <span id="topicPageName" class="text-xl font-bold"></span>
-      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 hidden text-sm">Delete Topic</button>
-    </div>
-  </div>
-
-  <p id="topicPageDesc" class="text-gray-600 mb-4"></p>
-
-  <!-- New Post -->
-  <div class="mb-4">
-    <textarea id="newPostContent" placeholder="Write your post..." rows="3" class="w-full px-4 py-2 border rounded-lg mb-2 resize-none"></textarea>
-    <div class="flex gap-2">
-      <button id="postBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Post</button>
-      <span id="editorStatus" class="text-sm text-gray-500 ml-2"></span>
-    </div>
-  </div>
-
-  <!-- Posts List -->
-  <div id="postsContainer" class="space-y-3"></div>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
-  authDomain: "schoolboard-942bc.firebaseapp.com",
-  databaseURL: "https://schoolboard-942bc-default-rtdb.firebaseio.com",
-  projectId: "schoolboard-942bc",
-  storageBucket: "schoolboard-942bc.firebasestorage.app",
-  messagingSenderId: "530189085355",
-  appId: "1:530189085355:web:6d2706eb965a7c5bf125ee"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
-
-let currentUser = null;
-let currentUserName = localStorage.getItem('anonName') || "User"+Math.floor(Math.random()*10000);
-localStorage.setItem('anonName', currentUserName);
-
-let currentUserId = localStorage.getItem('deviceId');
-if(!currentUserId){
-  currentUserId = Math.random().toString(36).substring(2,14).toUpperCase();
-  localStorage.setItem('deviceId', currentUserId);
-}
-
-const ADMIN_ID = "ADMINISTRATOR";
-let topicsCache = {};
-let currentTopicId = null;
-
-const welcome = document.getElementById('welcome-screen');
-const forumPage = document.getElementById('forumPage');
-const topicPage = document.getElementById('topicPage');
-const forumContainer = document.getElementById('forumContainer');
-const topicPageName = document.getElementById('topicPageName');
-const topicPageDesc = document.getElementById('topicPageDesc');
-const postsContainer = document.getElementById('postsContainer');
-const deleteTopicBtn = document.getElementById('deleteTopicBtn');
-const backToForumBtn = document.getElementById('backToForumBtn');
-const topicNameInput = document.getElementById('topicName');
-const topicDescInput = document.getElementById('topicDesc');
-const createTopicBtn = document.getElementById('createTopicBtn');
-const newPostContent = document.getElementById('newPostContent');
-const postBtn = document.getElementById('postBtn');
-const editorStatus = document.getElementById('editorStatus');
-const userTag = document.getElementById('userTag');
-const userIdTag = document.getElementById('userIdTag');
-
-userTag.innerText = currentUserName;
-userIdTag.innerText = currentUserId;
-
-function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
-function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
-function isAdmin() { return currentUserId === ADMIN_ID; }
-
-function showForumPage() {
-  forumPage.classList.remove('hidden');
-  setTimeout(()=>{
-    forumPage.style.opacity = 1;
-    welcome.style.opacity = 0;
-    setTimeout(()=>welcome.remove(), 400);
-  },50);
-}
-
-let storedUid = localStorage.getItem('anonUid');
-if(!storedUid){
-  signInAnonymously(auth).then(u=>{
-    currentUser = u.user;
-    storedUid = currentUser.uid;
-    localStorage.setItem('anonUid', storedUid);
-    set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
-    welcome.addEventListener('click', showForumPage);
-    initRealtime();
-  }).catch(console.error);
-}else{
-  currentUser = { uid: storedUid };
-  welcome.addEventListener('click', showForumPage);
-  initRealtime();
-}
-
-function initRealtime(){
-  onValue(ref(db,'topics'),snap=>{
-    topicsCache = snap.val()||{};
-    renderForum();
-    if(currentTopicId) renderTopicPage(currentTopicId);
-  });
-}
-
-function renderForum(){
-  const arr = Object.entries(topicsCache).map(([id,t])=>({id,...t}));
-
-  // 按收藏优先，再按帖子数量排序
-  arr.sort((a,b)=>{
-    const aFav = a.favorites && a.favorites[currentUser.uid] ? 1:0;
-    const bFav = b.favorites && b.favorites[currentUser.uid] ? 1:0;
-    if(aFav!==bFav) return bFav - aFav;
-    return (b.posts?Object.keys(b.posts).length:0) - (a.posts?Object.keys(a.posts).length:0);
-  });
-
-  forumContainer.innerHTML = arr.map(t=>{
-    const topPosts = t.posts?Object.entries(t.posts)
-      .map(([pid,p])=>({id:pid,...p}))
-      .sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0))
-      .slice(0,2):[];
-
-    const preview = topPosts.map(p=>`
-      <div class="text-sm text-gray-600">
-        ${escapeHtml(p.content)} 
-        <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span>
-      </div>`).join('');
-
-    const favClass = t.favorites && t.favorites[currentUser.uid] ? 'text-yellow-400' : 'text-gray-400';
-
-    return `
-    <div id="topic-${t.id}" class="bg-white p-4 rounded-lg shadow flex justify-between items-start cursor-pointer">
-      <div onclick="openTopic('${t.id}')">
-        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
-        <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
-        ${preview}
-      </div>
-      <div class="flex flex-col items-end gap-1">
-        <i data-lucide="star" onclick="toggleFavorite('${t.id}'); event.stopPropagation();" class="w-6 h-6 ${favClass}"></i>
-      </div>
-    </div>`;
-  }).join('');
-
-  lucide.createIcons();
-}
-window.toggleFavorite = async function(topicId){
-  const favRef = ref(db, `topics/${topicId}/favorites/${currentUser.uid}`);
-  const snap = await get(favRef);
-  const topicEl = document.getElementById(`topic-${topicId}`);
-  if(!topicEl) return;
-
-  if(snap.exists()){
-    // 取消收藏
-    remove(favRef).then(()=>{
-      topicEl.querySelector('i[data-lucide="star"]').classList.remove('text-yellow-400');
-      topicEl.querySelector('i[data-lucide="star"]').classList.add('text-gray-400');
-      renderForum(); // 重新排序
-    });
-  } else {
-    // 收藏
-    set(favRef,true).then(()=>{
-      const star = topicEl.querySelector('i[data-lucide="star"]');
-      star.classList.remove('text-gray-400');
-      star.classList.add('text-yellow-400');
-      topicEl.classList.add('animate-fade');
-      setTimeout(()=>topicEl.classList.remove('animate-fade'),500);
-      renderForum(); // 重新排序
-    });
-  }
-};
-
-// ---- Topic Navigation ----
-window.openTopic = function(topicId){
-  currentTopicId = topicId;
-  forumPage.classList.add('hidden'); 
-  topicPage.classList.remove('hidden'); 
-  setTimeout(()=>topicPage.style.opacity=1,50);
-  renderTopicPage(topicId);
-};
-
-backToForumBtn.addEventListener('click',()=>{
-  topicPage.classList.add('hidden'); 
-  forumPage.classList.remove('hidden'); 
-  setTimeout(()=>forumPage.style.opacity=1,50);
-  currentTopicId=null; 
-  newPostContent.value=''; 
-  editorStatus.innerText='';
-});
-
-// ---- Create Topic ----
-createTopicBtn.addEventListener("click", async ()=>{
-  if(!currentUser) return alert("Still signing in... try again in a sec");
-  const name = topicNameInput.value.trim();
-  const desc = topicDescInput.value.trim();
-  if(!name) return alert("Enter topic name");
-  try {
-    const newTopicRef = push(ref(db, "topics"));
-    await set(newTopicRef, { topicName: name, description: desc, authorUid: currentUser.uid, timestamp: Date.now() });
-    topicNameInput.value = "";
-    topicDescInput.value = "";
-    alert("Topic Created!");
-  } catch(err) {
-    console.error(err);
-    alert("Failed to create topic, try again later");
-  }
-});
 
   <!-- Drafts Panel -->
   <div id="draftsPanel" class="bg-gray-50 p-4 rounded-lg mb-6">
@@ -422,32 +188,15 @@ function initRealtime(){
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
 }
+
 function renderForum(){
-  window.toggleFavorite = async function(topicId){
-  const favRef = ref(db, `topics/${topicId}/favorites/${currentUser.uid}`);
-  const snap = await get(favRef);
-  const topicEl = document.getElementById(`topic-${topicId}`);
-  if(!topicEl) return;
-
-  if(snap.exists()){
-    remove(favRef).then(()=>{
-      topicEl.querySelector('i[data-lucide="star"]').classList.remove('text-yellow-400');
-      topicEl.querySelector('i[data-lucide="star"]').classList.add('text-gray-400');
-      renderForum();
-    });
-  } else {
-    set(favRef,true).then(()=>{
-      const star = topicEl.querySelector('i[data-lucide="star"]');
-      star.classList.remove('text-gray-400');
-      star.classList.add('text-yellow-400');
-      topicEl.classList.add('animate-fade');
-      setTimeout(()=>topicEl.classList.remove('animate-fade'),500);
-      renderForum();
-    });
-  }
-};
-}
-
+  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=>{
+    const aFav=a.favorites&&a.favorites[currentUser.uid]?1:0;
+    const bFav=b.favorites&&b.favorites[currentUser.uid]?1:0;
+    if(aFav!==bFav) return bFav-aFav;
+    return (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0);
+  });
   forumContainer.innerHTML=arr.map(t=>{
     const topPosts=t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
     const preview=topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
@@ -676,4 +425,4 @@ createTopicBtn.addEventListener("click", async ()=>{
 });
 </script>
 </body>
-</html>
+</html>为什么没法点赞 无法点击名字id进行更改
