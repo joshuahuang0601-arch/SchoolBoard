@@ -1,2 +1,2 @@
 # SchoolBoard
-A web that can help upper school students
+A web that can help the upper school students
