@@ -159,40 +159,6 @@ userTag.addEventListener('click', ()=>{
     set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
   }
 });
-  userIdTag.addEventListener('click', async ()=>{
-  const newId = prompt("Enter new 12-character ID (letters + digits only):", currentUserId);
-  if(!newId) return;
-
-  // 验证长度和字符
-  const valid = /^[A-Za-z0-9]{12}$/.test(newId);
-  if(!valid){
-    return alert("ID must be exactly 12 characters and contain only letters and digits.");
-  }
-
-  // 检查是否已存在
-  const usersRef = ref(db, 'users');
-  try{
-    const snapshot = await get(usersRef);
-    const users = snapshot.val() || {};
-    const exists = Object.values(users).some(u => u.userId === newId);
-    if(exists){
-      return alert("This ID is already taken. Please choose another one.");
-    }
-
-    // 更新 Firebase
-    await set(ref(db, `users/${currentUser.uid}/userId`), newId);
-
-    // 更新本地存储和显示
-    currentUserId = newId;
-    localStorage.setItem('deviceId', newId);
-    userIdTag.innerText = newId;
-    alert("ID updated successfully!");
-  }catch(err){
-    console.error(err);
-    alert("Error updating ID.");
-  }
-});
-
 
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
 function timeAgo(ts){const diff=(Date.now()-ts)/1000;if(diff<60)return 'Just now';if(diff<3600)return Math.floor(diff/60)+'m ago';if(diff<86400)return Math.floor(diff/3600)+'h ago';return Math.floor(diff/86400)+'d ago';}
@@ -296,97 +262,74 @@ function renderTopicPage(topicId){
   posts.forEach(p => { renderPostRecursive(p, postsContainer, topicId); });
 }
 
-function renderPostRecursive(post, parentElem, topicId){
-  const topic = topicsCache[topicId];
-  const canDelete = post.authorUid===currentUser.uid || topic.authorUid===currentUser.uid || isAdmin();
+function renderPostRecursive(post, parentElem, topicId) {
+  const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
 
-  // 创建帖子容器
   const div = document.createElement('div');
   div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
   div.innerHTML = `
-    <div class="flex justify-between items-start">
+    <div class="flex justify-between items-start" id="postHeader-${post.id}">
       <div>
-        <div class="font-medium text-gray-700">${escapeHtml(post.authorName||"Anonymous")}</div>
-        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp||0)}</div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName || "Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(post.timestamp || 0)}</div>
       </div>
       <div class="flex gap-2 post-actions">
         <i data-lucide="thumbs-up" class="w-5 h-5"></i>
         <span class="text-sm">${likesCount}</span>
-        ${canDelete?`<i data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>`:''}
+        ${canDelete ? `<i data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
-    <div class="mt-2 text-gray-700">${escapeHtml(post.content)}</div>
-    <span class="collapse-toggle ${post.replies?'':'hidden'}">Show Replies (${post.replies?Object.keys(post.replies).length:0})</span>
-    <div class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`)==='true'?'expanded':''}"></div>
-    <div class="mt-2 hidden flex gap-1 reply-box">
+    <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
+    <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
+    <div id="replies-${post.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? 'expanded' : ''}"></div>
+    <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
       <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
       <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
     </div>
   `;
   parentElem.appendChild(div);
-  lucide.createIcons(); // 渲染图标
+  lucide.createIcons();
 
-  const replyContainer = div.querySelector('.reply-container');
-  const replyBox = div.querySelector('.reply-box');
-  const replyInput = replyBox.querySelector('input');
-  const sendBtn = replyBox.querySelector('button');
-  const toggleBtn = div.querySelector('.collapse-toggle');
-  const likeBtn = div.querySelector('i[data-lucide="thumbs-up"]');
-  const delBtn = div.querySelector('i[data-lucide="trash-2"]');
-
-  // 递归渲染子回复
-  if(post.replies){
-    Object.entries(post.replies).forEach(([rid,rPost])=>{
-      renderPostRecursive({id:rid, ...rPost}, replyContainer, topicId);
-    });
-  }
-
-  // 点赞
+  const likeBtn = div.querySelector('.post-actions i[data-lucide="thumbs-up"]');
   likeBtn.addEventListener('click', e=>{
     e.stopPropagation();
     const likeRef = ref(db, `topics/${currentTopicId}/posts/${post.id}/likes/${currentUser.uid}`);
-    get(likeRef).then(snap=> snap.exists()? remove(likeRef): set(likeRef,true));
+    get(likeRef).then(snap=> snap.exists()? remove(likeRef) : set(likeRef,true));
   });
 
-  // 删除
+  const delBtn = div.querySelector('.post-actions i[data-lucide="trash-2"]');
   if(delBtn){
     delBtn.addEventListener('click', e=>{
       e.stopPropagation();
-      if(confirm("Delete this post?")) remove(ref(db, `topics/${currentTopicId}/posts/${post.id}`));
+      if(confirm("Delete this post?")){
+        remove(ref(db, `topics/${currentTopicId}/posts/${post.id}`));
+      }
     });
   }
 
-  // 点击帖子显示回复框
-  div.querySelector('.mt-2.text-gray-700').addEventListener('click', ()=>{
+  const postContentDiv = div.querySelector(`#postContent-${post.id}`);
+  const replyBox = div.querySelector(`#replyBox-${post.id}`);
+  const replyInput = replyBox.querySelector('input');
+  const sendBtn = replyBox.querySelector('button');
+  postContentDiv.addEventListener('click', ()=>{
     replyBox.classList.remove('hidden');
     replyInput.focus();
   });
 
-  // 发送回复
   sendBtn.addEventListener('click', ()=>{
     const val = replyInput.value.trim();
     if(!val) return;
-    push(ref(db, `topics/${currentTopicId}/posts/${post.id}/replies`), {
+    push(ref(db, `topics/${currentTopicId}/posts/${post.id}/replies`),{
       authorName: currentUserName,
       authorUid: currentUser.uid,
       content: val,
       timestamp: Date.now()
     });
-    replyInput.value='';
+    replyInput.value = '';
     replyBox.classList.add('hidden');
   });
-
-  // 折叠/展开回复
-  toggleBtn.addEventListener('click', e=>{
-    e.stopPropagation();
-    const expanded = replyContainer.classList.toggle('expanded');
-    localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
-    toggleBtn.innerText = expanded ? `Hide Replies (${Object.keys(post.replies||{}).length})` : `Show Replies (${Object.keys(post.replies||{}).length})`;
-  });
 }
-
-
 postBtn.addEventListener('click', ()=>{
   const content = newPostContent.value.trim();
   if(!content) return;
