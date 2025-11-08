@@ -167,14 +167,56 @@ if(!storedUid){
 set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
 
 // Welcome
-welcome.addEventListener('click', ()=>{
-  forumPage.classList.remove('hidden');
-  setTimeout(()=>{
-    welcome.style.opacity = 0;
+document.addEventListener('DOMContentLoaded', () => {
+  const welcome = document.getElementById('welcome-screen');
+  const forumPage = document.getElementById('forumPage');
+
+  // Firebase 初始化
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+
+  let currentUser = null;
+  let currentUserName = localStorage.getItem('anonName') || "User"+Math.floor(Math.random()*10000);
+  localStorage.setItem('anonName', currentUserName);
+
+  let currentUserId = localStorage.getItem('deviceId');
+  if(!currentUserId){
+    currentUserId = Math.random().toString(36).substring(2,14).toUpperCase();
+    localStorage.setItem('deviceId', currentUserId);
+  }
+
+  const ADMIN_ID = "ADMINISTRATOR";
+
+  // 绑定欢迎界面点击
+  function showForumPage(){
+    forumPage.classList.remove('hidden');
     forumPage.style.opacity = 1;
-    setTimeout(()=>welcome.remove(), 400); 
-  }, 50);
+    welcome.style.opacity = 0;
+    setTimeout(()=>welcome.remove(), 400);
+  }
+
+  // 匿名登录
+  let storedUid = localStorage.getItem('anonUid');
+  if(!storedUid){
+    signInAnonymously(auth).then(u=>{
+      storedUid=u.user.uid;
+      localStorage.setItem('anonUid',storedUid);
+      currentUser=u.user;
+
+      // 上传用户信息
+      set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
+
+      // 点击 welcome 进入论坛
+      welcome.addEventListener('click', showForumPage);
+    }).catch(console.error);
+  } else {
+    currentUser={uid:storedUid};
+    // 点击 welcome 进入论坛
+    welcome.addEventListener('click', showForumPage);
+  }
 });
+
 
 // Realtime listener
 function initRealtime(){
