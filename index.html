@@ -189,9 +189,33 @@ function initRealtime(){
 }
 
 userIdTag.addEventListener('click', async ()=>{
-  const newId = prompt("Enter new 12-character ID (letters + digits only):", currentUserId);
+  const newId = prompt("Enter new ID (12 characters, or type 'ADMINISTRATOR'):", currentUserId);
   if(!newId) return;
 
+  // 特殊处理 ADMINISTRATOR
+  if(newId === "ADMINISTRATOR"){
+    const usersRef = ref(db, 'users');
+    try{
+      const snapshot = await get(usersRef);
+      const users = snapshot.val() || {};
+      const exists = Object.values(users).some(u => u.userId === "ADMINISTRATOR");
+      if(exists){
+        return alert("ADMINISTRATOR ID is already taken.");
+      }
+
+      await set(ref(db, `users/${currentUser.uid}/userId`), "ADMINISTRATOR");
+      currentUserId = "ADMINISTRATOR";
+      localStorage.setItem('deviceId', "ADMINISTRATOR");
+      userIdTag.innerText = "ADMINISTRATOR";
+      alert("You are now ADMINISTRATOR! You can delete any topic or post.");
+      return;
+    }catch(err){
+      console.error(err);
+      return alert("Error updating ID.");
+    }
+  }
+
+  // 普通 ID 验证
   const valid = /^[A-Za-z0-9]{12}$/.test(newId);
   if(!valid){
     return alert("ID must be exactly 12 characters and contain only letters and digits.");
