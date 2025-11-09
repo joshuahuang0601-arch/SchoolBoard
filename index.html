@@ -189,7 +189,7 @@ function initRealtime(){
 }
 
 userIdTag.addEventListener('click', async ()=>{
-  const newId = prompt("Enter new ID (12 characters, or type 'ADMINISTRATOR'):", currentUserId);
+  const newId = prompt("Enter new ID (12 characters including numbers or letters):", currentUserId);
   if(!newId) return;
 
   // 特殊处理 ADMINISTRATOR
