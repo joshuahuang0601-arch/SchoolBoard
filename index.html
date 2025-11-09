@@ -7,230 +7,90 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <style>
-body { 
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height:100vh; 
-}
+body { background: linear-gradient(to bottom right, #eef2ff, #f5f3ff, #faf5ff); min-height:100vh; }
 .fade { transition: opacity 0.4s ease; }
 .hidden { display: none; }
-.reply { 
-  margin-left: 1rem; 
-  border-left: 3px solid #c7d2fe; 
-  padding-left:0.75rem; 
-  margin-top:0.75rem; 
-}
+.reply { margin-left: 1rem; border-left: 2px solid #ddd; padding-left:0.5rem; margin-top:0.5rem; }
 .cursor-pointer { cursor: pointer; }
-.collapse-toggle { 
-  font-size:0.85rem; 
-  color:#6366f1; 
-  cursor:pointer; 
-  margin-top:0.5rem;
-  display:inline-block;
-  font-weight:500;
-}
-.collapse-toggle:hover { color:#4f46e5; }
-.post-actions i { cursor: pointer; transition: all 0.2s; }
-.post-actions i:hover { transform: scale(1.2); }
+.collapse-toggle { font-size:0.8rem; color:#555; cursor:pointer; margin-left:0.5rem; }
+.user-info { font-size: 0.8rem; color:#555; }
+.post-actions i { cursor: pointer; }
 
+/* 回复折叠动画 */
 .reply-container {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s ease;
+  transition: max-height 0.3s ease;
 }
 .reply-container.expanded {
-  max-height: 5000px;
-}
-
-.admin-badge {
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: white;
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-weight: 600;
-  margin-left: 6px;
-  display: inline-block;
-}
-
-.topic-card {
-  transition: all 0.3s ease;
-}
-.topic-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.stat-badge {
-  background: #eef2ff;
-  color: #6366f1;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-slide-in {
-  animation: slideIn 0.4s ease;
-}
-
-.search-box {
-  transition: all 0.3s;
-}
-.search-box:focus {
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  max-height: 2000px; /* 足够大以容纳所有子回复 */
 }
 </style>
 </head>
 <body class="min-h-screen">
 
 <!-- Welcome Screen -->
-<div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 fade z-40 cursor-pointer">
-  <div class="text-center space-y-4">
-    <h1 class="text-6xl font-bold text-white select-none mb-4 drop-shadow-lg">SchoolBoard Forum</h1>
-    <p class="text-white text-xl animate-pulse">🎓 Click anywhere to enter</p>
-    <div class="flex gap-3 justify-center text-white/80 text-sm mt-6">
-      <span>📝 Share Ideas</span>
-      <span>💬 Discuss Topics</span>
-      <span>🤝 Connect</span>
-    </div>
-  </div>
+<div id="welcome-screen" class="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 fade z-40">
+  <h1 class="text-5xl font-bold text-indigo-700 select-none mb-4">Welcome to SchoolBoard Forum!</h1>
+  <p class="text-gray-600 text-lg animate-pulse">Click to ENTER</p>
 </div>
 
 <!-- Forum Page -->
-<div id="forumPage" class="hidden fade opacity-0 max-w-7xl mx-auto px-4 py-8">
-  <!-- Header -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 mb-6">
-    <div class="flex justify-between items-center">
-      <div>
-        <h1 class="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">SchoolBoard Forum</h1>
-        <p class="text-gray-600 mt-1">Share knowledge, discuss ideas</p>
-      </div>
-      <div class="flex flex-col items-end text-right">
-        <div class="flex items-center gap-2">
-          <span id="userTag" class="cursor-pointer text-gray-800 font-semibold hover:text-indigo-600 transition"></span>
-          <span id="adminBadge" class="admin-badge hidden">ADMIN</span>
-        </div>
-        <span id="userIdTag" class="cursor-pointer text-gray-500 text-sm hover:text-indigo-600 transition"></span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Stats Bar -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg p-4 mb-6 flex gap-4 justify-around">
-    <div class="text-center">
-      <div class="text-2xl font-bold text-indigo-600" id="totalTopics">0</div>
-      <div class="text-sm text-gray-600">Topics</div>
-    </div>
-    <div class="text-center">
-      <div class="text-2xl font-bold text-purple-600" id="totalPosts">0</div>
-      <div class="text-sm text-gray-600">Posts</div>
-    </div>
-    <div class="text-center">
-      <div class="text-2xl font-bold text-pink-600" id="myTopics">0</div>
-      <div class="text-sm text-gray-600">My Topics</div>
-    </div>
-  </div>
-
-  <!-- Search and Filter -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg p-4 mb-6">
-    <div class="flex gap-3">
-      <input id="searchBox" type="text" placeholder="🔍 Search topics..." class="search-box flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500">
-      <select id="sortSelect" class="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500">
-        <option value="activity">Most Active</option>
-        <option value="recent">Most Recent</option>
-        <option value="popular">Most Popular</option>
-      </select>
+<div id="forumPage" class="hidden fade opacity-0 max-w-6xl mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-800">SchoolBoard Forum</h1>
+    <div class="flex flex-col items-end text-right">
+      <span id="userTag" class="cursor-pointer text-gray-700"></span>
+      <span id="userIdTag" class="cursor-pointer text-gray-500"></span>
     </div>
   </div>
 
   <!-- Create Topic -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 mb-6">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-      <i data-lucide="plus-circle" class="w-6 h-6 text-indigo-600"></i>
-      Create New Topic
-    </h2>
-    <input id="topicName" placeholder="Topic name" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg mb-3 focus:outline-none focus:border-indigo-500 transition">
-    <textarea id="topicDesc" placeholder="Optional description" rows="3" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg mb-3 focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
-    <div class="flex gap-3">
-      <button id="createTopicBtn" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition font-semibold">
-        Create Topic
-      </button>
-      <button id="saveDraftBtn" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition font-semibold">
-        Save Draft
-      </button>
+  <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h2 class="text-xl font-bold mb-4 text-gray-800">Create New Topic</h2>
+    <input id="topicName" placeholder="Topic name" class="w-full px-4 py-2 border rounded-lg mb-2">
+    <textarea id="topicDesc" placeholder="Optional description" rows="2" class="w-full px-4 py-2 border rounded-lg mb-2"></textarea>
+    <div class="flex gap-2">
+      <button id="createTopicBtn" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700">Create Topic</button>
+      <button id="saveDraftBtn" class="bg-gray-300 px-5 py-2 rounded-lg hover:bg-gray-400">Save Draft</button>
     </div>
   </div>
 
   <!-- Drafts Panel -->
-  <div id="draftsPanel" class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5 mb-6" style="display:none;">
-    <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
-      <i data-lucide="file-text" class="w-5 h-5 text-amber-600"></i>
-      Your Drafts
-    </h3>
+  <div id="draftsPanel" class="bg-gray-50 p-4 rounded-lg mb-6" style="display:none;">
+    <h3 class="font-bold text-gray-700 mb-2">Your Drafts</h3>
     <div id="draftsContainer"></div>
   </div>
 
   <!-- Topics List -->
   <div id="forumContainer" class="space-y-4"></div>
-  
-  <!-- Empty State -->
-  <div id="emptyState" class="hidden text-center py-16 bg-white/95 backdrop-blur rounded-2xl">
-    <div class="text-6xl mb-4">📭</div>
-    <h3 class="text-xl font-semibold text-gray-700 mb-2">No topics found</h3>
-    <p class="text-gray-500">Be the first to create a topic!</p>
-  </div>
 </div>
 
 <!-- Topic Page -->
-<div id="topicPage" class="hidden fade opacity-0 max-w-7xl mx-auto px-4 py-8">
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 mb-6">
-    <div class="flex justify-between items-center mb-4">
-      <button id="backToForumBtn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition flex items-center gap-2 font-semibold">
-        <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Forum
-      </button>
-      <div class="flex items-center gap-3">
-        <button id="deleteTopicBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition hidden font-semibold">
-          <i data-lucide="trash-2" class="w-4 h-4 inline"></i> Delete Topic
-        </button>
-      </div>
-    </div>
-    <h2 id="topicPageName" class="text-3xl font-bold text-gray-800 mb-2"></h2>
-    <p id="topicPageDesc" class="text-gray-600 mb-4"></p>
-    <div class="flex gap-3 text-sm text-gray-500">
-      <span id="topicTime"></span>
-      <span>•</span>
-      <span id="topicPostCount" class="stat-badge"></span>
+<div id="topicPage" class="hidden fade opacity-0 max-w-6xl mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <button id="backToForumBtn" class="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 flex items-center gap-2">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Forum
+    </button>
+    <div class="flex items-center gap-2">
+      <span id="topicPageName" class="text-xl font-bold"></span>
+      <button id="deleteTopicBtn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 hidden text-sm">Delete Topic</button>
     </div>
   </div>
 
+  <p id="topicPageDesc" class="text-gray-600 mb-4"></p>
+
   <!-- New Post -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg p-6 mb-6">
-    <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
-      <i data-lucide="message-square" class="w-5 h-5 text-indigo-600"></i>
-      Write a Post
-    </h3>
-    <textarea id="newPostContent" placeholder="Share your thoughts..." rows="4" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg mb-3 resize-none focus:outline-none focus:border-indigo-500 transition"></textarea>
-    <div class="flex gap-3 items-center">
-      <button id="postBtn" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition font-semibold">
-        <i data-lucide="send" class="w-4 h-4 inline"></i> Post
-      </button>
-      <span id="editorStatus" class="text-sm text-gray-500"></span>
+  <div class="mb-4">
+    <textarea id="newPostContent" placeholder="Write your post..." rows="3" class="w-full px-4 py-2 border rounded-lg mb-2 resize-none"></textarea>
+    <div class="flex gap-2">
+      <button id="postBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Post</button>
+      <span id="editorStatus" class="text-sm text-gray-500 ml-2"></span>
     </div>
   </div>
 
   <!-- Posts List -->
-  <div id="postsContainer" class="space-y-4"></div>
-  
-  <!-- Empty Posts State -->
-  <div id="emptyPosts" class="hidden text-center py-16 bg-white/95 backdrop-blur rounded-2xl">
-    <div class="text-6xl mb-4">💭</div>
-    <h3 class="text-xl font-semibold text-gray-700 mb-2">No posts yet</h3>
-    <p class="text-gray-500">Be the first to share your thoughts!</p>
-  </div>
+  <div id="postsContainer" class="space-y-3"></div>
 </div>
 
 <script type="module">
@@ -238,6 +98,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebas
 import { getDatabase, ref, push, onValue, remove, set, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyARjDy8wyvqgGFv0pEFXiSUHbw0_9srVEk",
   authDomain: "schoolboard-942bc.firebaseapp.com",
@@ -265,8 +126,6 @@ if(!currentUserId){
 const ADMIN_ID = "ADMINISTRATOR";
 let topicsCache = {};
 let currentTopicId = null;
-let searchQuery = '';
-let sortBy = 'activity';
 
 const welcome = document.getElementById('welcome-screen');
 const forumPage = document.getElementById('forumPage');
@@ -288,15 +147,9 @@ const postBtn = document.getElementById('postBtn');
 const editorStatus = document.getElementById('editorStatus');
 const userTag = document.getElementById('userTag');
 const userIdTag = document.getElementById('userIdTag');
-const adminBadge = document.getElementById('adminBadge');
-const searchBox = document.getElementById('searchBox');
-const sortSelect = document.getElementById('sortSelect');
-const emptyState = document.getElementById('emptyState');
-const emptyPosts = document.getElementById('emptyPosts');
 
 userTag.innerText = currentUserName;
 userIdTag.innerText = currentUserId;
-if(isAdmin()) adminBadge.classList.remove('hidden');
   
 userTag.addEventListener('click', ()=>{
   const newName = prompt("Enter your display name:", currentUserName);
@@ -304,7 +157,7 @@ userTag.addEventListener('click', ()=>{
     currentUserName = newName.trim();
     localStorage.setItem('anonName', currentUserName);
     userTag.innerText = currentUserName;
-    if(currentUser) set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
+    set(ref(db, `users/${currentUser.uid}/name`), currentUserName);
   }
 });
 
@@ -314,7 +167,9 @@ if(!storedUid){
     currentUser = u.user;
     storedUid = currentUser.uid;
     localStorage.setItem('anonUid', storedUid);
+
     set(ref(db, `users/${currentUser.uid}`), { name: currentUserName, userId: currentUserId });
+
     welcome.addEventListener('click', showForumPage);
     initRealtime();
   }).catch(console.error);
@@ -328,7 +183,6 @@ function initRealtime(){
   onValue(ref(db,'topics'),snap=>{
     topicsCache = snap.val()||{};
     renderForum();
-    updateStats();
     if(currentTopicId) renderTopicPage(currentTopicId);
   });
   loadDrafts();
@@ -338,21 +192,22 @@ userIdTag.addEventListener('click', async ()=>{
   const newId = prompt("Enter new ID (12 characters, or type 'ADMINISTRATOR'):", currentUserId);
   if(!newId) return;
 
+  // 特殊处理 ADMINISTRATOR
   if(newId === "ADMINISTRATOR"){
     const usersRef = ref(db, 'users');
     try{
       const snapshot = await get(usersRef);
       const users = snapshot.val() || {};
       const exists = Object.values(users).some(u => u.userId === "ADMINISTRATOR");
-      if(exists && currentUserId !== "ADMINISTRATOR"){
+      if(exists){
         return alert("ADMINISTRATOR ID is already taken.");
       }
-      if(currentUser) await set(ref(db, `users/${currentUser.uid}/userId`), "ADMINISTRATOR");
+
+      await set(ref(db, `users/${currentUser.uid}/userId`), "ADMINISTRATOR");
       currentUserId = "ADMINISTRATOR";
       localStorage.setItem('deviceId', "ADMINISTRATOR");
       userIdTag.innerText = "ADMINISTRATOR";
-      adminBadge.classList.remove('hidden');
-      alert("🎉 You are now ADMINISTRATOR! You can delete any topic or post.");
+      alert("You are now ADMINISTRATOR! You can delete any topic or post.");
       return;
     }catch(err){
       console.error(err);
@@ -360,6 +215,7 @@ userIdTag.addEventListener('click', async ()=>{
     }
   }
 
+  // 普通 ID 验证
   const valid = /^[A-Za-z0-9]{12}$/.test(newId);
   if(!valid){
     return alert("ID must be exactly 12 characters and contain only letters and digits.");
@@ -373,26 +229,17 @@ userIdTag.addEventListener('click', async ()=>{
     if(exists){
       return alert("This ID is already taken. Please choose another one.");
     }
-    if(currentUser) await set(ref(db, `users/${currentUser.uid}/userId`), newId);
+
+    await set(ref(db, `users/${currentUser.uid}/userId`), newId);
+
     currentUserId = newId;
     localStorage.setItem('deviceId', newId);
     userIdTag.innerText = newId;
-    adminBadge.classList.add('hidden');
     alert("ID updated successfully!");
   }catch(err){
     console.error(err);
     alert("Error updating ID.");
   }
-});
-
-searchBox.addEventListener('input', (e)=>{
-  searchQuery = e.target.value.toLowerCase();
-  renderForum();
-});
-
-sortSelect.addEventListener('change', (e)=>{
-  sortBy = e.target.value;
-  renderForum();
 });
   
 function escapeHtml(str){return String(str||"").replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;").replaceAll("\n","<br/>");}
@@ -405,69 +252,25 @@ function showForumPage() {
     forumPage.style.opacity = 1;
     welcome.style.opacity = 0;
     setTimeout(()=>welcome.remove(), 400);
-    lucide.createIcons();
   },50);
 }
 
-function updateStats(){
-  const topics = Object.values(topicsCache);
-  document.getElementById('totalTopics').innerText = topics.length;
-  
-  let totalPosts = 0;
-  topics.forEach(t => {
-    if(t.posts) totalPosts += Object.keys(t.posts).length;
-  });
-  document.getElementById('totalPosts').innerText = totalPosts;
-  
-  const myTopicsCount = topics.filter(t => t.authorUid === currentUser.uid).length;
-  document.getElementById('myTopics').innerText = myTopicsCount;
-}
-
 function renderForum(){
-  let arr = Object.entries(topicsCache).map(([id,t])=>({id,...t}));
-  
-  if(searchQuery){
-    arr = arr.filter(t => 
-      t.topicName.toLowerCase().includes(searchQuery) || 
-      (t.description && t.description.toLowerCase().includes(searchQuery))
-    );
-  }
-  
-  if(sortBy === 'activity'){
-    arr.sort((a,b)=>(b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0));
-  } else if(sortBy === 'recent'){
-    arr.sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
-  } else if(sortBy === 'popular'){
-    arr.sort((a,b)=>{
-      const aLikes = Object.values(a.posts||{}).reduce((sum,p)=>(p.likes?Object.keys(p.likes).length:0)+sum, 0);
-      const bLikes = Object.values(b.posts||{}).reduce((sum,p)=>(p.likes?Object.keys(p.likes).length:0)+sum, 0);
-      return bLikes - aLikes;
-    });
-  }
-  
-  if(arr.length === 0){
-    forumContainer.innerHTML = '';
-    emptyState.classList.remove('hidden');
-    return;
-  }
-  
-  emptyState.classList.add('hidden');
-  forumContainer.innerHTML = arr.map(t=>{
-    const postCount = t.posts ? Object.keys(t.posts).length : 0;
-    const topPosts = t.posts ? Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2) : [];
-    const preview = topPosts.map(p=>`<div class="text-sm text-gray-600 mt-2 truncate">💬 ${escapeHtml(p.content)}</div>`).join('');
-    
-    return `<div class="topic-card bg-white/95 backdrop-blur p-5 rounded-xl shadow-lg cursor-pointer" onclick="openTopic('${t.id}')">
-      <div class="flex justify-between items-start mb-3">
-        <div class="flex-1">
-          <h3 class="font-bold text-xl text-gray-800 mb-1">${escapeHtml(t.topicName)}</h3>
-          <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
-        </div>
-        <div class="stat-badge ml-3">${postCount} posts</div>
-      </div>
-      ${preview}
-      <div class="mt-3 text-xs text-gray-400 flex gap-2">
-        <span>📅 ${timeAgo(t.timestamp||0)}</span>
+  const arr=Object.entries(topicsCache).map(([id,t])=>({id,...t}));
+  arr.sort((a,b)=>{
+    const aFav=a.favorites&&a.favorites[currentUser.uid]?1:0;
+    const bFav=b.favorites&&b.favorites[currentUser.uid]?1:0;
+    if(aFav!==bFav) return bFav-aFav;
+    return (b.posts?Object.keys(b.posts).length:0)-(a.posts?Object.keys(a.posts).length:0);
+  });
+  forumContainer.innerHTML=arr.map(t=>{
+    const topPosts=t.posts?Object.entries(t.posts).map(([pid,p])=>({id:pid,...p})).sort((a,b)=>(b.likes?Object.keys(b.likes).length:0)-(a.likes?Object.keys(a.likes).length:0)).slice(0,2):[];
+    const preview=topPosts.map(p=>`<div class="text-sm text-gray-600">${escapeHtml(p.content)} <span class="text-xs text-gray-400">(${p.likes?Object.keys(p.likes).length:0} likes)</span></div>`).join('');
+    return `<div class="bg-white p-4 rounded-lg shadow flex justify-between cursor-pointer" onclick="openTopic('${t.id}')">
+      <div>
+        <h3 class="font-bold text-gray-800">${escapeHtml(t.topicName)}</h3>
+        <p class="text-gray-500 text-sm">${escapeHtml(t.description||"")}</p>
+        ${preview}
       </div>
     </div>`;
   }).join('');
@@ -477,10 +280,7 @@ window.openTopic = function(topicId){
   currentTopicId = topicId;
   forumPage.classList.add('hidden'); 
   topicPage.classList.remove('hidden'); 
-  setTimeout(()=>{
-    topicPage.style.opacity=1;
-    lucide.createIcons();
-  },50);
+  setTimeout(()=>topicPage.style.opacity=1,50);
   renderTopicPage(topicId);
 };
 
@@ -500,60 +300,37 @@ function renderTopicPage(topicId){
   topicPageName.innerText = topic.topicName;
   topicPageDesc.innerText = topic.description || '';
   deleteTopicBtn.style.display = (topic.authorUid === currentUser.uid || isAdmin()) ? 'inline-block' : 'none';
-  
-  const postCount = topic.posts ? Object.keys(topic.posts).length : 0;
-  document.getElementById('topicPostCount').innerText = `${postCount} posts`;
-  document.getElementById('topicTime').innerText = timeAgo(topic.timestamp || 0);
 
   const posts = topic.posts ? Object.entries(topic.posts).map(([id,p])=>({id,...p})).sort((a,b)=>b.timestamp-a.timestamp) : [];
-  
-  if(posts.length === 0){
-    postsContainer.innerHTML = '';
-    emptyPosts.classList.remove('hidden');
-    return;
-  }
-  
-  emptyPosts.classList.add('hidden');
   postsContainer.innerHTML = '';
   posts.forEach(p => { renderPostRecursive(p, postsContainer, topicId); });
-  lucide.createIcons();
 }
 
 function renderPostRecursive(post, parentElem, topicId) {
   const canDelete = post.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
   const userLiked = post.likes && post.likes[currentUser.uid] ? true : false;
   const likesCount = post.likes ? Object.keys(post.likes).length : 0;
-  const replyCount = post.replies ? Object.keys(post.replies).length : 0;
 
   const div = document.createElement('div');
-  div.className = 'bg-white/95 backdrop-blur p-5 rounded-xl shadow-lg animate-slide-in';
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
   div.innerHTML = `
-    <div class="flex justify-between items-start mb-3">
+    <div class="flex justify-between items-start" id="postHeader-${post.id}">
       <div>
-        <div class="font-semibold text-gray-800">${escapeHtml(post.authorName || "Anonymous")}</div>
+        <div class="font-medium text-gray-700">${escapeHtml(post.authorName || "Anonymous")}</div>
         <div class="text-gray-400 text-sm">${timeAgo(post.timestamp || 0)}</div>
       </div>
-      <div class="flex gap-3 post-actions items-center">
-        <div class="flex items-center gap-1">
-          <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-indigo-600' : 'text-gray-400'} w-5 h-5"></i>
-          <span class="text-sm font-semibold ${userLiked ? 'text-indigo-600' : 'text-gray-600'}">${likesCount}</span>
-        </div>
-        ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-500 w-5 h-5"></i>` : ''}
+      <div class="flex gap-2 post-actions">
+        <i onclick="likePost('${post.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete ? `<i onclick="deletePost('${post.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
       </div>
     </div>
-    <div class="text-gray-700 mb-3 leading-relaxed">${escapeHtml(post.content)}</div>
-    ${replyCount > 0 ? `<span class="collapse-toggle" id="toggle-${post.id}">💬 Show ${replyCount} ${replyCount===1?'Reply':'Replies'}</span>` : ''}
+    <div class="mt-2 text-gray-700" id="postContent-${post.id}">${escapeHtml(post.content)}</div>
+    <span class="collapse-toggle ${post.replies ? '' : 'hidden'}" id="toggle-${post.id}">Show Replies (${post.replies ? Object.keys(post.replies).length : 0})</span>
     <div id="replies-${post.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${post.id}`) === 'true' ? 'expanded' : ''}"></div>
-    <button onclick="toggleReplyBox('${post.id}')" class="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-semibold">
-      ↩️ Reply
-    </button>
-    <div id="replyBox-${post.id}" class="mt-3 hidden">
-      <div class="flex gap-2">
-        <input placeholder="Write a reply..." class="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500">
-        <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold">
-          <i data-lucide="send" class="w-4 h-4"></i>
-        </button>
-      </div>
+    <div id="replyBox-${post.id}" class="mt-2 hidden flex gap-1">
+      <input placeholder="Reply..." class="flex-1 px-2 py-1 border rounded w-full">
+      <button class="p-1 bg-indigo-500 text-white rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
     </div>
   `;
   parentElem.appendChild(div);
@@ -561,24 +338,223 @@ function renderPostRecursive(post, parentElem, topicId) {
   const repliesEl = div.querySelector(`#replies-${post.id}`);
   const toggleEl = div.querySelector(`#toggle-${post.id}`);
   const replyBox = div.querySelector(`#replyBox-${post.id}`);
-  const replyInput = replyBox?.querySelector('input');
-  const sendBtn = replyBox?.querySelector('button');
+  const replyInput = replyBox.querySelector('input');
+  const sendBtn = replyBox.querySelector('button');
 
-  if(sendBtn && replyInput){
-    sendBtn.addEventListener('click', () => {
-      if (!replyInput.value.trim()) return;
-      submitReply(post.id, replyInput.value);
-      replyInput.value = '';
-      replyBox.classList.add('hidden');
+  div.querySelector(`#postContent-${post.id}`).addEventListener('click', () => {
+    replyBox.classList.remove('hidden');
+    replyInput.focus();
+  });
+
+  sendBtn.addEventListener('click', () => {
+    if (!replyInput.value.trim()) return;
+    submitReply(post.id, replyInput.value);
+    replyInput.value = '';
+    replyBox.classList.add('hidden');
+  });
+
+  if(post.replies){
+    toggleEl.classList.remove('hidden');
+    toggleEl.addEventListener('click', () => {
+      const expanded = repliesEl.classList.toggle('expanded');
+      toggleEl.innerText = expanded ? 'Hide Replies' : `Show Replies (${Object.keys(post.replies).length})`;
+      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
+    });
+
+    Object.entries(post.replies).forEach(([rid, rp]) => {
+      renderReplyRecursive({...rp, id:rid}, repliesEl, topicId, post.id, 1);
     });
   }
 
- if(post.replies && toggleEl){
-    toggleEl.addEventListener('click', () => {
-      const expanded = repliesEl.classList.toggle('expanded');
-      toggleEl.innerText = expanded ? `💬 Hide Replies` : `💬 Show ${replyCount} ${replyCount===1?'Reply':'Replies'}`;
-      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
+  lucide.createIcons();
+}
+
+function renderReplyRecursive(reply, parentElem, topicId, parentPostId, level = 1) {
+  const canDelete = reply.authorUid === currentUser.uid || topicsCache[topicId].authorUid === currentUser.uid || isAdmin();
+  const userLiked = reply.likes && reply.likes[currentUser.uid] ? true : false;
+  const likesCount = reply.likes ? Object.keys(reply.likes).length : 0;
+
+  const div = document.createElement('div');
+  div.className = 'bg-gray-50 p-3 rounded shadow mt-2 cursor-pointer reply';
+  div.style.marginLeft = `${level * 1}rem`;
+  div.innerHTML = `
+    <div class="flex justify-between items-start">
+      <div>
+        <div class="font-medium text-gray-700">${escapeHtml(reply.authorName || "Anonymous")}</div>
+        <div class="text-gray-400 text-sm">${timeAgo(reply.timestamp || 0)}</div>
+      </div>
+      <div class="flex gap-2 post-actions">
+        <i onclick="likeReply('${parentPostId}','${reply.id}')" data-lucide="thumbs-up" class="${userLiked ? 'text-blue-600' : 'text-gray-400'} w-5 h-5"></i>
+        <span class="text-sm">${likesCount}</span>
+        ${canDelete ? `<i onclick="deleteReply('${parentPostId}','${reply.id}')" data-lucide="trash-2" class="text-red-600 w-5 h-5"></i>` : ''}
+      </div>
+    </div>
+    <div class="mt-2 text-gray-700">${escapeHtml(reply.content)}</div>
+    <div id="replies-${reply.id}" class="reply-container ${localStorage.getItem(`repliesExpanded-${reply.id}`) === 'true' ? 'expanded' : ''}"></div>
+  `;
+  parentElem.appendChild(div);
+
+  const repliesEl = div.querySelector(`#replies-${reply.id}`);
+
+  if (reply.replies) {
+    Object.entries(reply.replies).forEach(([rid, rp]) => {
+      renderReplyRecursive({ ...rp, id: rid }, repliesEl, topicId, parentPostId, level + 1);
     });
-   </script>
+  }
+
+  lucide.createIcons();
+}
+
+window.submitReply=function(postId,content){
+  if(!content.trim()) return;
+  push(ref(db,`topics/${currentTopicId}/posts/${postId}/replies`),{
+    authorName: currentUserName,
+    authorUid: currentUser.uid,
+    content: content,
+    timestamp: Date.now()
+  }).then(() => {
+    setTimeout(() => {
+      const repliesEl = document.getElementById(`replies-${postId}`);
+      if(repliesEl){
+        repliesEl.classList.add('expanded');
+        repliesEl.scrollTop = repliesEl.scrollHeight;
+      }
+    }, 100);
+  });
+};
+
+postBtn.addEventListener('click', ()=>{
+  const val = newPostContent.value.trim(); 
+  if(!val) return alert("Enter post content"); 
+  push(ref(db,`topics/${currentTopicId}/posts`),{
+    authorName: currentUserName,
+    authorUid: currentUser.uid,
+    content: val,
+    timestamp: Date.now()
+  }); 
+  newPostContent.value = ''; 
+  editorStatus.innerText = 'Posted'; 
+  setTimeout(()=>editorStatus.innerText='', 1000);
+});
+
+// ✅ 修复后的点赞功能
+window.likePost = async function(postId){
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/likes/${currentUser.uid}`);
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    await remove(likeRef);
+  } else {
+    await set(likeRef, true);
+  }
+};
+
+window.likeReply = async function(postId, replyId){
+  const likeRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+  const snap = await get(likeRef);
+  if(snap.exists()){
+    await remove(likeRef);
+  } else {
+    await set(likeRef, true);
+  }
+};
+
+window.deletePost = function(postId){
+  const post = topicsCache[currentTopicId]?.posts?.[postId];
+  if(!post) return;
+  const canDelete = post.authorUid === currentUser.uid || topicsCache[currentTopicId].authorUid === currentUser.uid || isAdmin();
+  if(!canDelete) return alert("You do not have permission to delete this post.");
+  if(!confirm("Delete this post?")) return;
+  remove(ref(db, `topics/${currentTopicId}/posts/${postId}`));
+};
+
+window.deleteReply = async function(postId, replyId){
+  const replyRef = ref(db, `topics/${currentTopicId}/posts/${postId}/replies/${replyId}`);
+  const snap = await get(replyRef);
+  if(!snap.exists()) return;
+  if(!confirm("Delete this reply?")) return;
+  remove(replyRef);
+};
+
+deleteTopicBtn.addEventListener('click', ()=>{
+  const topic = topicsCache[currentTopicId];
+  if(!topic) return;
+  if(!(topic.authorUid === currentUser.uid || isAdmin())) return alert("You do not have permission to delete this topic.");
+  if(!confirm("Delete entire topic?")) return;
+  remove(ref(db, `topics/${currentTopicId}`));
+  currentTopicId = null; 
+  topicPage.classList.add('hidden'); 
+  forumPage.classList.remove('hidden');
+});
+
+createTopicBtn.addEventListener("click", async ()=>{
+  if(!currentUser) return alert("Still signing in... try again in a sec");
+  const name = topicNameInput.value.trim();
+  const desc = topicDescInput.value.trim();
+  if(!name) return alert("Enter topic name");
+  try {
+    const newTopicRef = push(ref(db, "topics"));
+    await set(newTopicRef, { topicName: name, description: desc, authorUid: currentUser.uid, timestamp: Date.now() });
+    topicNameInput.value = "";
+    topicDescInput.value = "";
+    alert("Topic Created!");
+  } catch(err) {
+    console.error(err);
+    alert("Failed to create topic, try again later");
+  }
+});
+
+// ✅ 草稿功能实现
+saveDraftBtn.addEventListener('click', ()=>{
+  const name = topicNameInput.value.trim();
+  const desc = topicDescInput.value.trim();
+  if(!name && !desc) return alert("Nothing to save");
+  
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  drafts.push({ name, desc, timestamp: Date.now() });
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  
+  topicNameInput.value = "";
+  topicDescInput.value = "";
+  alert("Draft saved!");
+  loadDrafts();
+});
+
+function loadDrafts(){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  if(drafts.length === 0){
+    draftsPanel.style.display = 'none';
+    return;
+  }
+  draftsPanel.style.display = 'block';
+  draftsContainer.innerHTML = drafts.map((d, idx)=>`
+    <div class="bg-white p-3 rounded shadow mb-2 flex justify-between items-start">
+      <div class="flex-1">
+        <div class="font-medium">${escapeHtml(d.name)}</div>
+        <div class="text-sm text-gray-600">${escapeHtml(d.desc)}</div>
+        <div class="text-xs text-gray-400">${timeAgo(d.timestamp)}</div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="useDraft(${idx})" class="text-sm bg-indigo-500 text-white px-2 py-1 rounded hover:bg-indigo-600">Use</button>
+        <button onclick="deleteDraft(${idx})" class="text-sm bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.useDraft = function(idx){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  if(!drafts[idx]) return;
+  topicNameInput.value = drafts[idx].name;
+  topicDescInput.value = drafts[idx].desc;
+  deleteDraft(idx);
+};
+
+window.deleteDraft = function(idx){
+  const drafts = JSON.parse(localStorage.getItem('topicDrafts') || '[]');
+  drafts.splice(idx, 1);
+  localStorage.setItem('topicDrafts', JSON.stringify(drafts));
+  loadDrafts();
+};
+</script>
 </body>
 </html>
