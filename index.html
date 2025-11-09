@@ -573,8 +573,11 @@ function renderPostRecursive(post, parentElem, topicId) {
     });
   }
 
-  if(post.replies && toggleEl){
+ if(post.replies && toggleEl){
     toggleEl.addEventListener('click', () => {
       const expanded = repliesEl.classList.toggle('expanded');
       toggleEl.innerText = expanded ? `💬 Hide Replies` : `💬 Show ${replyCount} ${replyCount===1?'Reply':'Replies'}`;
-      localStorage.setItem(`repliesExpanded-${post
+      localStorage.setItem(`repliesExpanded-${post.id}`, expanded);
+    });
+   </script>
+   </html>
